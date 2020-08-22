@@ -36,4 +36,46 @@ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
 SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAM
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+=========================================================================*/
+#include "vtkCalcCentroid.h"
+#include "vtkObjectFactory.h"
+
+//--------------------------------------------------------------------------
+vtkCalcCentroid* vtkCalcCentroid::New()
+{
+  // First try to create the object from the vtkObjectFactory
+  vtkObject* ret = vtkObjectFactory::CreateInstance("vtkCalcCentroid");
+  if(ret)
+    {
+    return (vtkCalcCentroid*)ret;
+    }
+  // If the factory was unable to create the object, then create it here.
+  return new vtkCalcCentroid;
+}
+
+//--------------------------------------------------------------------------
+// Constructs with initial 0 values.
+vtkCalcCentroid::vtkCalcCentroid()
+{
+  this->Input = NULL;
+  this->Centroid[0] = 0.0;
+  this->Centroid[1] = 0.0;
+  this->Centroid[2] = 0.0;
+  for (int i=0; i<=8; i++) 
+    this->CovarianceMatrix[i]=0.0;
+}
+
+//--------------------------------------------------------------------------
+vtkCalcCentroid::~vtkCalcCentroid()
+{
+}
+
+//--------------------------------------------------------------------------
+// Function to set up the covariance matrix
+template <class T>
+static int vtkCalculateCovarianceMatrix(vtkImageData * input, 
+                                        T *inPtr,
+                                        double *centroid,
+         
