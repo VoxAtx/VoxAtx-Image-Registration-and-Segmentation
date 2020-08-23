@@ -78,4 +78,39 @@ template <class T>
 static int vtkCalculateCovarianceMatrix(vtkImageData * input, 
                                         T *inPtr,
                                         double *centroid,
-         
+                                        int *inputExtent, 
+                                        double *covar)
+{
+  vtkIdType inInc0, inInc1, inInc2;
+  int idx0, idx1, idx2;
+  T *inPtr0, *inPtr1, *inPtr2;
+
+  double sxx = 0.0, sxy = 0.0, sxz = 0.0;
+  double syx = 0.0, syy = 0.0, syz = 0.0;
+  double szx = 0.0, szy = 0.0, szz = 0.0, si = 0.0;
+  float dataCentroid[3];  //centroid in data coordinates
+  vtkFloatingPointType *spacing = input->GetSpacing();
+  vtkFloatingPointType *origin = input->GetOrigin();
+
+  dataCentroid[0] = (centroid[0] - origin[0])/spacing[0];
+  dataCentroid[1] = (centroid[1] - origin[1])/spacing[1];
+  dataCentroid[2] = (centroid[2] - origin[2])/spacing[2];
+  
+  input->GetIncrements(inInc0, inInc1, inInc2);
+
+  inPtr2 = inPtr;
+  for (idx2 = inputExtent[4]; idx2 <= inputExtent[5]; ++idx2)
+    {
+      inPtr1 = inPtr2;
+      for (idx1 = inputExtent[2]; idx1 <= inputExtent[3]; ++idx1)
+	{
+	  inPtr0 = inPtr1;
+	  for (idx0 = inputExtent[0]; idx0 <= inputExtent[1]; ++idx0)
+	    {
+	      sxx += (idx0-centroid[0]) * (idx0-centroid[0]) * *inPtr0;
+	      sxy += (idx0-centroid[0]) * (idx1-centroid[1]) * *inPtr0;
+	      sxz += (idx0-centroid[0]) * (idx2-centroid[2]) * *inPtr0;
+
+	      syx += (idx1-centroid[1]) * (idx0-centroid[0]) * *inPtr0;
+	      syy += (idx1-centroid[1]) * (idx1-centroid[1]) * *inPtr0;
+	     
