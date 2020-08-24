@@ -159,4 +159,55 @@ static void vtkCalculateCentroid(vtkImageData *input,
   vtkFloatingPointType *spacing = input->GetSpacing();
   vtkFloatingPointType *origin = input->GetOrigin();
   
-  input->GetIn
+  input->GetIncrements(inInc0, inInc1, inInc2);
+
+  inPtr2 = inPtr;
+  for (idx2 = inputExtent[4]; idx2 <= inputExtent[5]; ++idx2)
+    {
+      inPtr1 = inPtr2;
+      for (idx1 = inputExtent[2]; idx1 <= inputExtent[3]; ++idx1)
+	{
+	  inPtr0 = inPtr1;
+	  for (idx0 = inputExtent[0]; idx0 <= inputExtent[1]; ++idx0)
+	    {
+	      XMoment += *inPtr0*idx0;
+	      YMoment += *inPtr0*idx1;
+	      ZMoment += *inPtr0*idx2;
+	      totalMass += *inPtr0;
+	      inPtr0 += inInc0;
+	    }
+	  inPtr1 += inInc1;
+	}
+      inPtr2 += inInc2;
+    }
+  
+  xyz[0] = ((XMoment / totalMass) * spacing[0]) + origin[0];
+  xyz[1] = ((YMoment / totalMass) * spacing[1]) + origin[1];
+  xyz[2] = ((ZMoment / totalMass) * spacing[2]) + origin[2];
+}
+
+
+//--------------------------------------------------------------------------
+double *vtkCalcCentroid::GetCentroid()
+{
+  this->ComputeCentroid();
+  return this->Centroid;
+}
+
+//--------------------------------------------------------------------------
+double *vtkCalcCentroid::GetCovarianceMatrix()
+{
+  this->ComputeCovarianceMatrix();
+  return this->CovarianceMatrix;
+}
+
+//--------------------------------------------------------------------------
+void vtkCalcCentroid::ComputeCentroid()
+{
+  float centroid[3];
+  centroid[0] = centroid[1] = centroid[2] = 0.0; 
+  
+  // make sure input is available
+  if ( ! this->Input )
+    {
+    vtkErrorMacro(<< "No input...can't e
