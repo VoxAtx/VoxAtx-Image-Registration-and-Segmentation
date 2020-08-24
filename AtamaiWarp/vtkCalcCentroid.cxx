@@ -210,4 +210,52 @@ void vtkCalcCentroid::ComputeCentroid()
   // make sure input is available
   if ( ! this->Input )
     {
-    vtkErrorMacro(<< "No input...can't e
+    vtkErrorMacro(<< "No input...can't execute!");
+    }
+
+  int inputExtent[6];
+  this->Input->GetWholeExtent(inputExtent);
+  this->Input->SetUpdateExtent(inputExtent);
+  this->Input->Update();
+  
+  void *inPtr = this->Input->GetScalarPointerForExtent(inputExtent);
+  
+  switch (this->Input->GetScalarType())
+      {
+#if (VTK_MAJOR_VERSION < 5)
+        vtkTemplateMacro4(vtkCalculateCentroid, this->Input,
+                          (VTK_TT *)(inPtr), inputExtent, centroid);
+#else
+        vtkTemplateMacro(
+            vtkCalculateCentroid(this->Input, 
+                                 (VTK_TT *)(inPtr), inputExtent, centroid));
+#endif
+    default:
+      vtkErrorMacro(<< "Execute: Unknown ScalarType");
+    }
+  if ( this->Input->ShouldIReleaseData() )
+    {
+      this->Input->ReleaseData();
+    }
+  this->Centroid[0] = centroid[0];
+  this->Centroid[1] = centroid[1];
+  this->Centroid[2] = centroid[2];
+}
+
+//--------------------------------------------------------------------------
+void vtkCalcCentroid::ComputeCovarianceMatrix()
+{
+  // make sure input is available
+  if ( ! this->Input )
+    {
+    vtkErrorMacro(<< "No input...can't execute!");
+    }
+
+  int inputExtent[6];
+  this->Input->GetWholeExtent(inputExtent);
+  this->Input->SetUpdateExtent(inputExtent);
+  this->Input->Update();
+  
+  void *inPtr = this->Input->GetScalarPointerForExtent(inputExtent);
+  
+  s
