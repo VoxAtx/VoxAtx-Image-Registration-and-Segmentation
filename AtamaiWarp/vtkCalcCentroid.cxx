@@ -113,4 +113,50 @@ static int vtkCalculateCovarianceMatrix(vtkImageData * input,
 
 	      syx += (idx1-centroid[1]) * (idx0-centroid[0]) * *inPtr0;
 	      syy += (idx1-centroid[1]) * (idx1-centroid[1]) * *inPtr0;
-	     
+	      syz += (idx1-centroid[1]) * (idx2-centroid[2]) * *inPtr0;
+
+	      szx += (idx2-centroid[2]) * (idx0-centroid[0]) * *inPtr0;
+	      szy += (idx2-centroid[2]) * (idx1-centroid[1]) * *inPtr0;
+	      szz += (idx2-centroid[2]) * (idx2-centroid[2]) * *inPtr0;
+	      si += *inPtr0;
+
+	      inPtr0 += inInc0;
+	    }
+	  inPtr1 += inInc1;
+	}
+      inPtr2 += inInc2;
+    }
+  if (si != 0.0) {
+    covar[0] = sxx/si; covar[1] = sxy/si; covar[2] = sxz/si;
+    covar[3] = syx/si; covar[4] = syy/si; covar[5] = syz/si;
+    covar[6] = szx/si; covar[7] = szy/si; covar[8] = szz/si;
+    
+    return(1);
+  }
+  else {
+    return(0);
+  }
+}
+
+//--------------------------------------------------------------------------
+// Description:
+// This templated function executes the filter for any type of data.
+template <class T>
+static void vtkCalculateCentroid(vtkImageData *input, 
+                                 T *inPtr,
+                                 int *inputExtent, 
+                                 float xyz[3])
+{
+  vtkIdType inInc0, inInc1, inInc2;
+  int idx0, idx1, idx2;
+  T *inPtr0, *inPtr1, *inPtr2;
+  
+  float XMoment = 0.0;
+  float YMoment = 0.0;
+  float ZMoment = 0.0;
+  float totalMass = 0.0;
+
+  vtkFloatingPointType *spacing = input->GetSpacing();
+  vtkFloatingPointType *origin = input->GetOrigin();
+  
+  input->GetIn
