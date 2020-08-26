@@ -258,4 +258,41 @@ void vtkCalcCentroid::ComputeCovarianceMatrix()
   
   void *inPtr = this->Input->GetScalarPointerForExtent(inputExtent);
   
-  s
+  switch (this->Input->GetScalarType())
+      {
+#if (VTK_MAJOR_VERSION < 5)
+        vtkTemplateMacro5(vtkCalculateCovarianceMatrix, this->Input,
+                          (VTK_TT *)(inPtr), this->Centroid, 
+                          inputExtent, this->CovarianceMatrix);
+#else
+        vtkTemplateMacro(
+            vtkCalculateCovarianceMatrix(this->Input, 
+                                         (VTK_TT *)(inPtr), this->Centroid, 
+                                         inputExtent, this->CovarianceMatrix));
+#endif
+    default:
+      vtkErrorMacro(<< "Execute: Unknown ScalarType");
+    }
+
+  if ( this->Input->ShouldIReleaseData() )
+    {
+      this->Input->ReleaseData();
+    }
+}
+
+//--------------------------------------------------------------------------
+void vtkCalcCentroid::PrintSelf(ostream& os, vtkIndent indent)
+{
+  double *mat = this->CovarianceMatrix;
+  vtkObject::PrintSelf(os,indent);
+
+  if (!this->GetInput()) 
+    {
+    return;
+    }
+  os << indent << "Centroid: [" << this->Centroid[0] << "," <<
+    this->Centroid[1] << "," << this->Centroid[2] << "]\n";
+  os << indent << "Covariance Matrix:\n" \
+     << indent << "[" << mat[0] << "," << mat[1] << "," << mat[2] << "]\n"\
+     << indent << "[" << mat[3] << "," << mat[4] << "," << mat[5] << "]\n"\
+     << indent << "[" << mat[6
