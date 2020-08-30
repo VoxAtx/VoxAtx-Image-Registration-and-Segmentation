@@ -295,4 +295,6 @@ void vtkCalcCentroid::PrintSelf(ostream& os, vtkIndent indent)
   os << indent << "Covariance Matrix:\n" \
      << indent << "[" << mat[0] << "," << mat[1] << "," << mat[2] << "]\n"\
      << indent << "[" << mat[3] << "," << mat[4] << "," << mat[5] << "]\n"\
-     << indent << "[" << mat[6
+     << indent << "[" << mat[6] << "," << mat[7] << "," << mat[8] << "]\n";
+    
+}
