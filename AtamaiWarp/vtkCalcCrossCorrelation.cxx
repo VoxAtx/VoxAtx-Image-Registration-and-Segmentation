@@ -55,4 +55,53 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 vtkCalcCrossCorrelation* vtkCalcCrossCorrelation::New()
 {
   // First try to create the object from the vtkObjectFactory
-  vtkObject* ret = vt
+  vtkObject* ret = vtkObjectFactory::CreateInstance("vtkCalcCrossCorrelation");
+  if(ret)
+    {
+    return (vtkCalcCrossCorrelation*)ret;
+    }
+  // If the factory was unable to create the object, then create it here.
+  return new vtkCalcCrossCorrelation;
+}
+
+// Constructs with initial 0 values.
+vtkCalcCrossCorrelation::vtkCalcCrossCorrelation()
+{
+  this->CrossCorrelation = 0.0;
+  this->ReverseStencil = 0;
+
+#if (VTK_MAJOR_VERSION >= 5) 
+  // we have the image inputs and the optional stencil input
+  this->SetNumberOfInputPorts(2);
+#endif
+}
+
+// Destroy any allocated memory.
+vtkCalcCrossCorrelation::~vtkCalcCrossCorrelation()
+{
+}
+
+// Description:
+// Specifies the input datasets
+void vtkCalcCrossCorrelation::SetInput1(vtkImageData *input)
+{
+#if (VTK_MAJOR_VERSION >= 5)
+  this->SetNthInputConnection(0, 0, (input ? input->GetProducerPort() : 0));
+#else
+  this->vtkProcessObject::SetNthInput(0, input);
+#endif
+}
+void vtkCalcCrossCorrelation::SetInput2(vtkImageData *input)
+{
+#if (VTK_MAJOR_VERSION >= 5)
+  this->SetNthInputConnection(0, 1, (input ? input->GetProducerPort() : 0));
+#else
+  this->vtkProcessObject::SetNthInput(1, input);
+#endif
+}
+
+//----------------------------------------------------------------------------
+void vtkCalcCrossCorrelation::SetStencil(vtkImageStencilData *stencil)
+{
+#if (VTK_MAJOR_VERSION >= 5)
+  // if stencil is null, then set the input port to nu
