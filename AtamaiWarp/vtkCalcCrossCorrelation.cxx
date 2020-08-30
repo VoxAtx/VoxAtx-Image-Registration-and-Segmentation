@@ -104,4 +104,56 @@ void vtkCalcCrossCorrelation::SetInput2(vtkImageData *input)
 void vtkCalcCrossCorrelation::SetStencil(vtkImageStencilData *stencil)
 {
 #if (VTK_MAJOR_VERSION >= 5)
-  // if stencil is null, then set the input port to nu
+  // if stencil is null, then set the input port to null
+  this->SetNthInputConnection(1, 0, 
+    (stencil ? stencil->GetProducerPort() : 0));
+#else
+  this->vtkProcessObject::SetNthInput(2, stencil);
+#endif
+}
+
+//----------------------------------------------------------------------------
+vtkImageData *vtkCalcCrossCorrelation::GetInput1()
+{
+#if (VTK_MAJOR_VERSION >= 5)
+  if (this->GetNumberOfInputConnections(0) < 1)
+    {
+    return NULL;
+    }
+  return vtkImageData::SafeDownCast(this->GetExecutive()->GetInputData(0, 0));
+#else
+  if (this->GetNumberOfInputs() < 1)    
+    {
+    return NULL;
+    }
+  return (vtkImageData *)(this->Inputs[0]);
+#endif
+}
+//----------------------------------------------------------------------------
+vtkImageData *vtkCalcCrossCorrelation::GetInput2()
+{
+#if (VTK_MAJOR_VERSION >= 5)
+  if (this->GetNumberOfInputConnections(0) < 2)
+    {
+    return NULL;
+    }
+  return vtkImageData::SafeDownCast(this->GetExecutive()->GetInputData(0, 1));
+#else
+  if (this->GetNumberOfInputs() < 2)    
+    {
+    return NULL;
+    }
+  return (vtkImageData *)(this->Inputs[1]);
+#endif
+}
+
+//----------------------------------------------------------------------------
+vtkImageStencilData *vtkCalcCrossCorrelation::GetStencil()
+{
+#if (VTK_MAJOR_VERSION >= 5)
+  if (this->GetNumberOfInputConnections(1) < 1)
+    {
+    return NULL;
+    }
+  return vtkImageStencilData::SafeDownCast(
+    this->GetEx
