@@ -156,4 +156,59 @@ vtkImageStencilData *vtkCalcCrossCorrelation::GetStencil()
     return NULL;
     }
   return vtkImageStencilData::SafeDownCast(
-    this->GetEx
+    this->GetExecutive()->GetInputData(1, 0));
+#else
+  if (this->NumberOfInputs < 3)
+    {
+    return NULL;
+    }
+  else
+    {
+    return (vtkImageStencilData *)(this->Inputs[2]);
+    }
+#endif
+}
+
+// Description:
+// Make sure input is available then call up execute method...
+void vtkCalcCrossCorrelation::Update()
+{
+  vtkImageData *input1 = this->GetInput1();
+  vtkImageData *input2 = this->GetInput2();
+  
+  // make sure input is available
+  if ( ! input1 || ! input2)
+    {
+    vtkErrorMacro(<< "No inputs...can't execute!");
+    return;
+    }
+
+  input1->UpdateData();
+  input2->UpdateData();
+
+  vtkImageStencilData *stencil = this->GetStencil();
+  if (stencil)
+    {
+    stencil->SetSpacing(input1->GetSpacing());
+    stencil->SetOrigin(input1->GetOrigin());
+    stencil->SetUpdateExtent(stencil->GetWholeExtent());
+    stencil->Update();
+    }
+
+  if (input1->GetMTime() > this->ExecuteTime || input2->GetMTime() > this->ExecuteTime || 
+      this->GetMTime() > this->ExecuteTime )
+    {
+    if ( input1->GetDataReleased() )
+      {
+      input1->Update();
+      }
+    if ( input2->GetDataReleased() )
+      {
+      input2->Update();
+      }
+    this->InvokeEvent(vtkCommand::StartEvent,NULL);
+
+    // reset Abort flag
+    this->AbortExecute = 0;
+    this->Progress = 0.0;
+   
