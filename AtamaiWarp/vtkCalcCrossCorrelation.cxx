@@ -269,4 +269,53 @@ void vtkCorrelationHelper(vtkCalcCrossCorrelation *self,
 
       // loop over stencil sub-extents
       iter = 0;
-      if (self->GetRev
+      if (self->GetReverseStencil())
+	{// flag that we want the complementary extents
+	iter = -1;
+	}
+
+      pminX = minX;
+      pmaxX = maxX;
+      while ((stencil !=0 &&
+	      stencil->GetNextExtent(pminX, pmaxX, minX, maxX, idY, idZ, iter)) ||
+	     (stencil == 0 && iter++ == 0))
+	{
+	// set up pointers to the sub-extents
+	temp1Ptr = in1Ptr + (incZ*(idZ - minZ) +
+			     incY*(idY - minY) +
+			     (pminX-minX));
+	temp2Ptr = in2Ptr + (incZ*(idZ - minZ) +
+			     incY*(idY - minY) +
+			     (pminX-minX));
+	// compute over the sub-extent
+	for (idX = pminX; idX <= pmaxX; idX++)
+	  { // only add pixels if both are non-zero
+	  if (*temp1Ptr && *temp2Ptr) 
+	    {
+	    topSum += (double)*temp1Ptr * (double)*temp2Ptr;
+	    Sum1   += (double)*temp1Ptr * (double)*temp1Ptr;
+	    Sum2   += (double)*temp2Ptr * (double)*temp2Ptr;
+	    }
+	  temp1Ptr++;
+	  temp2Ptr++;
+	  }
+	}
+      }
+    }
+  *Correlation = (double) topSum / (sqrt((double)Sum1) * sqrt((double(Sum2)))); 
+}
+
+// Description:
+// This method computes normalized cross correlation.
+// Requires that the inputs are the same extent.
+void vtkCalcCrossCorrelation::Execute()
+{
+  vtkImageData *input1 = this->GetInput1();
+  vtkImageData *input2 = this->GetInput2();
+
+  if (!input1 || !input2)
+    {
+    vtkErrorMacro("Must set both inputs");
+    return;
+    }
+  if (input1->GetScalarType() != input2->GetScalarType()
