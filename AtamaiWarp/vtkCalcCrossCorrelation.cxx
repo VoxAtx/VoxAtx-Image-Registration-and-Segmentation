@@ -211,4 +211,62 @@ void vtkCalcCrossCorrelation::Update()
     // reset Abort flag
     this->AbortExecute = 0;
     this->Progress = 0.0;
-   
+    this->Execute();
+    this->ExecuteTime.Modified();
+    if ( !this->AbortExecute )
+      {
+      this->UpdateProgress(1.0);
+      }
+
+    this->InvokeEvent(vtkCommand::EndEvent,NULL);
+    }
+  if ( input1->ShouldIReleaseData() )
+    {
+    input1->ReleaseData();
+    }
+  if ( input2->ShouldIReleaseData() )
+    {
+    input2->ReleaseData();
+    }
+}
+
+template <class T>
+void vtkCorrelationHelper(vtkCalcCrossCorrelation *self,
+			  vtkImageData *inData1, T *in1Ptr, 
+			  vtkImageData *inData2, T *in2Ptr,
+			  double *Correlation)
+{
+  int idX, idY, idZ;
+  vtkIdType incX, incY, incZ;
+  int minX, maxX, minY, maxY, minZ, maxZ;
+  int pminX, pmaxX;
+  int iter;
+  *Correlation = 0.0;
+  double topSum = 0;
+  double Sum1 = 0;
+  double Sum2 = 0;
+  T *temp1Ptr;
+  T *temp2Ptr;
+
+  vtkImageStencilData *stencil = self->GetStencil();
+
+  inData1->GetUpdateExtent(minX, maxX, minY, maxY, minZ, maxZ);
+  inData1->GetIncrements(incX, incY, incZ);
+  
+  unsigned long count = 0;
+  unsigned long target = (unsigned long)((maxZ - minZ + 1)*(maxY - minY +1)/50.0);
+  target++;
+
+  for (idZ = minZ; idZ <= maxZ; idZ++)
+    {
+     for (idY = minY; idY <= maxY; idY++)
+      {
+      if (!(count%target)) 
+	{
+        self->UpdateProgress(count/(50.0*target));
+	}
+      count++;
+
+      // loop over stencil sub-extents
+      iter = 0;
+      if (self->GetRev
