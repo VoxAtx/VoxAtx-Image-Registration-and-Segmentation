@@ -318,4 +318,54 @@ void vtkCalcCrossCorrelation::Execute()
     vtkErrorMacro("Must set both inputs");
     return;
     }
-  if (input1->GetScalarType() != input2->GetScalarType()
+  if (input1->GetScalarType() != input2->GetScalarType())
+    {
+    vtkErrorMacro("Scalar Types must be the same");
+    return;
+    }
+
+  vtkImageStencilData *stencil = this->GetStencil();
+
+  if (stencil)
+    {
+    stencil->SetWholeExtent(input1->GetWholeExtent());
+    stencil->SetUpdateExtent(stencil->GetWholeExtent());
+    stencil->Update();
+    }
+   
+  input1->SetUpdateExtent(input1->GetWholeExtent());
+  input1->Update();
+  input2->SetUpdateExtent(input2->GetWholeExtent());
+  input2->Update();
+  void *in1Ptr = input1->GetScalarPointer();
+  void *in2Ptr = input2->GetScalarPointer();
+
+  if (!in1Ptr || !in2Ptr)
+    {
+    vtkErrorMacro("No data in the ImageDatas");
+    return;
+    }
+
+  switch (input1->GetScalarType())
+    {
+#if (VTK_MAJOR_VERSION < 5)
+    vtkTemplateMacro6(vtkCorrelationHelper,this,
+		      input1, (VTK_TT *)(in1Ptr),
+		      input2, (VTK_TT *)(in2Ptr),
+		      &this->CrossCorrelation);
+#else
+    vtkTemplateMacro(
+      vtkCorrelationHelper(this,
+			   input1, (VTK_TT *)(in1Ptr),
+			   input2, (VTK_TT *)(in2Ptr),
+			   &this->CrossCorrelation));
+#endif
+    default:
+      vtkErrorMacro(<< "Execute: Unknown ScalarType (must be char, us char, int, us int");
+      return;
+    }
+}
+
+void vtkCalcCrossCorrelation::PrintSelf(ostream& os, vtkIndent indent)
+{
+  vtkProcessObject::PrintSelf(os,
