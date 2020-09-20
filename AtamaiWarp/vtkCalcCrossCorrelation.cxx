@@ -368,4 +368,42 @@ void vtkCalcCrossCorrelation::Execute()
 
 void vtkCalcCrossCorrelation::PrintSelf(ostream& os, vtkIndent indent)
 {
-  vtkProcessObject::PrintSelf(os,
+  vtkProcessObject::PrintSelf(os,indent);
+
+  os << indent << "Input 1: "<< this->GetInput1() << "\n";
+  os << indent << "Input 2: "<< this->GetInput2() << "\n";
+  os << indent << "Stencil: " << this->GetStencil() << "\n";
+  os << indent << "ReverseStencil: " << (this->ReverseStencil ? "On\n" : "Off\n");
+  os << indent << "CrossCorrelation: " << this->GetCrossCorrelation () << "\n";
+}
+
+#if (VTK_MAJOR_VERSION >= 5) 
+//----------------------------------------------------------------------------
+int vtkCalcCrossCorrelation::FillInputPortInformation(int port, 
+                                                      vtkInformation* info)
+{
+  if (port == 0)
+    {
+    info->Set(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkImageData");
+    info->Set(vtkAlgorithm::INPUT_IS_REPEATABLE(), 1);
+    }
+  if (port == 1)
+    {
+    info->Set(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkImageStencilData");
+    // the stencil input is optional
+    info->Set(vtkAlgorithm::INPUT_IS_OPTIONAL(), 1);
+    }
+  return 1;
+}
+#endif
+
+
+
+
+
+
+
+
+
+
+
