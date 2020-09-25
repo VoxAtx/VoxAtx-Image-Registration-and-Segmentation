@@ -208,3 +208,27 @@ void vtkImageGridStatistics::Update()
 	  return;
 	}
       this->ExecuteTime.Modified();
+      if (!this->AbortExecute)
+	{
+	  this->UpdateProgress(1.0);
+	}
+      this->InvokeEvent(vtkCommand::EndEvent, NULL);
+    }
+  if (input->ShouldIReleaseData())
+    {
+      input->ReleaseData();
+    }
+}
+
+//----------------------------------------------------------------------------
+void vtkImageGridStatistics::PrintSelf(ostream& os, vtkIndent indent)
+{
+  vtkProcessObject::PrintSelf(os,indent);
+
+  if (!this->GetInput())
+    {
+      return;
+    }
+  os << indent << "AverageMagnitude: " << this->AverageMagnitude << "\n";
+  os << indent << "StandardDeviation: " << this->StandardDeviation << "\n";
+}
