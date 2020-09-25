@@ -52,4 +52,49 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 class vtkImageData;
 
-class VTK_EXPORT vtkImageDataSt
+class VTK_EXPORT vtkImageDataStatistics : public vtkProcessObject
+{
+public:
+  vtkTypeMacro(vtkImageDataStatistics,vtkProcessObject);
+  static vtkImageDataStatistics *New();
+
+  void PrintSelf(ostream& os, vtkIndent indent);
+
+  // Description:
+  // Compute and return the average magnitude.
+  double GetAverageMagnitude() {this->Update(); return this->AverageMagnitude;}
+
+  // Description:
+  // Compute and return the standard deviation.
+  double GetStandardDeviation() {this->Update(); return this->StandardDeviation;}
+
+  // Description:
+  // Compute and return the standard deviation.
+  long int GetCount() {this->Update(); return this->Count;}
+
+  void Update();
+
+  void SetInput(vtkImageData *input);
+  vtkImageData *GetInput();
+
+protected:
+  vtkImageDataStatistics();
+  ~vtkImageDataStatistics();
+
+  void Execute();
+
+  double AverageMagnitude;
+  double StandardDeviation;
+  long int Count;
+
+  vtkTimeStamp ExecuteTime;
+
+private:
+  vtkImageDataStatistics(const vtkImageDataStatistics&); // Not implemented.
+  void operator=(const vtkImageDataStatistics&); // Not implemented.
+};
+
+#endif
+
+
+
