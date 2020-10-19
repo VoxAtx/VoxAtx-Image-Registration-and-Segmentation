@@ -1,0 +1,6 @@
+==========================================================================
+
+Copyright (c) 2000-2010 Atamai, Inc.
+
+Use, modification and redistribution of the software, in source or
+binary forms, are permitted provided that the following 

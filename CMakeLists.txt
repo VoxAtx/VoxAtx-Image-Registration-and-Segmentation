@@ -143,4 +143,31 @@ ENDIF(BUILD_TESTING)
 OPTION(BUILD_EXAMPLES "Build the examples" ON)
 IF (BUILD_EXAMPLES)
    ADD_SUBDIRECTORY(Examples)
-ENDIF (BUILD_EXAMPL
+ENDIF (BUILD_EXAMPLES)
+
+# Add airs.py.in file.  On Win32, this has to go into all config
+IF(VTK_WRAP_PYTHON)
+  IF(WIN32 AND CMAKE_CONFIGURATION_TYPES)
+    FOREACH(config ${CMAKE_CONFIGURATION_TYPES})
+      CONFIGURE_FILE(
+        ${AIRS_SOURCE_DIR}/airs.py.in
+        ${LIBRARY_OUTPUT_PATH}/${config}/airs.py)
+    ENDFOREACH(config)
+  ELSE(WIN32 AND CMAKE_CONFIGURATION_TYPES)
+    CONFIGURE_FILE(
+      ${AIRS_SOURCE_DIR}/airs.py.in
+      ${LIBRARY_OUTPUT_PATH}/airs.py)
+  ENDIF(WIN32 AND CMAKE_CONFIGURATION_TYPES)
+ENDIF(VTK_WRAP_PYTHON)
+
+# Configuration header
+SET(AIRS_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+SET(AIRS_BUILD_TESTING ${BUILD_TESTING})
+CONFIGURE_FILE(CMake/AIRSConfig.h.in
+  "${AIRS_BINARY_DIR}/AIRSConfig.h" @ONLY)
+
+#-----------------------------------------------------------------------------
+# The commands in this directory are intended to be executed as
+# the end of the whole configuration process, as a "last step".
+# This directory is typically the last SUBDIRS in the main CMakeLists.txt.
+ADD_SUBDIRECTORY(CMake/LastConfigureStep)
