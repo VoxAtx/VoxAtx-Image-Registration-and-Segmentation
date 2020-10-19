@@ -59,4 +59,47 @@ IF(BUILD_DOCUMENTATION)
 ENDIF(BUILD_DOCUMENTATION)
 
 # Output directories.
-SET(LIBRARY_OUTPUT_PATH ${AIRS_BINARY_DIR}/bin CACHE INTERNAL "Si
+SET(LIBRARY_OUTPUT_PATH ${AIRS_BINARY_DIR}/bin CACHE INTERNAL "Single output directory for building all libraries.")
+SET(EXECUTABLE_OUTPUT_PATH ${AIRS_BINARY_DIR}/bin CACHE INTERNAL "Single output directory for building all executables.")
+SET(AIRS_LIBRARY_DIR ${LIBRARY_OUTPUT_PATH}/${CMAKE_CFG_INTDIR})
+SET(AIRS_EXECUTABLE_DIR ${EXECUTABLE_OUTPUT_PATH}/${CMAKE_CFG_INTDIR})
+SET(CXX_TEST_PATH ${EXECUTABLE_OUTPUT_PATH})
+
+# Configure Dart testing support.
+INCLUDE(${CMAKE_ROOT}/Modules/Dart.cmake)
+
+# ---------------------------------------------------------------
+# Initialize configuration
+
+# Kits
+SET(AIRS_KITS)
+
+# Libraries
+SET(AIRS_LIBRARIES)
+
+# Include directories
+SET(AIRS_INCLUDE_DIRS ${AIRS_BINARY_DIR})
+
+# ---------------------------------------------------------------
+# Include the Tcl and Python wrappers
+IF(VTK_WRAP_TCL)
+  IF(VTK_TCL_INCLUDE_DIR)
+    INCLUDE_DIRECTORIES("${VTK_TCL_INCLUDE_DIR}")
+  ENDIF(VTK_TCL_INCLUDE_DIR)
+  INCLUDE(${VTK_CMAKE_DIR}/vtkWrapTcl.cmake)
+ENDIF(VTK_WRAP_TCL)
+
+IF(VTK_WRAP_PYTHON)
+  IF(VTK_PYTHON_INCLUDE_DIR)
+    INCLUDE_DIRECTORIES("${VTK_PYTHON_INCLUDE_DIR}")
+  ENDIF(VTK_PYTHON_INCLUDE_DIR)
+  SET(VTK_WRAP_PYTHON_FIND_LIBS ON)
+  INCLUDE(${VTK_CMAKE_DIR}/vtkWrapPython.cmake)
+ENDIF(VTK_WRAP_PYTHON)
+
+IF(VTK_WRAP_JAVA)
+  SET(VTK_WRAP_JAVA 0)
+ENDIF(VTK_WRAP_JAVA)
+
+# Include AIRSThirdParty
+INCLUDE(${AIRS_SOURCE_DIR}/CMake/AIRS
