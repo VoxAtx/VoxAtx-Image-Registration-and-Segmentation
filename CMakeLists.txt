@@ -102,4 +102,45 @@ IF(VTK_WRAP_JAVA)
 ENDIF(VTK_WRAP_JAVA)
 
 # Include AIRSThirdParty
-INCLUDE(${AIRS_SOURCE_DIR}/CMake/AIRS
+INCLUDE(${AIRS_SOURCE_DIR}/CMake/AIRSThirdParty.cmake)
+
+# ---------------------------------------------------------------
+# Start listing the AIRS kits
+
+# ImageRegistration
+OPTION (AIRS_USE_IMAGEREGISTRATION "Build the ImageRegistration module" ON)
+IF (AIRS_USE_IMAGEREGISTRATION)
+  SET(AIRS_INCLUDE_DIRS ${AIRS_INCLUDE_DIRS}
+      "${AIRS_BINARY_DIR}/ImageRegistration"
+      "${AIRS_SOURCE_DIR}/ImageRegistration")
+  ADD_SUBDIRECTORY(ImageRegistration)
+  SET(AIRS_LIBRARIES ${AIRS_LIBRARIES} vtkImageRegistration)
+ENDIF (AIRS_USE_IMAGEREGISTRATION)
+
+# ImageSegmentation
+OPTION (AIRS_USE_IMAGESEGMENTATION "Build the ImageSegmentation module" ON)
+IF (AIRS_USE_IMAGESEGMENTATION)
+  SET(AIRS_INCLUDE_DIRS ${AIRS_INCLUDE_DIRS}
+      "${AIRS_BINARY_DIR}/ImageSegmentation"
+      "${AIRS_SOURCE_DIR}/ImageSegmentation")
+  ADD_SUBDIRECTORY(ImageSegmentation)
+  SET(AIRS_LIBRARIES ${AIRS_LIBRARIES} vtkImageSegmentation)
+ENDIF (AIRS_USE_IMAGESEGMENTATION)
+
+# Build Programs
+OPTION(BUILD_PROGRAMS "Build standard programs" ON)
+IF(BUILD_PROGRAMS)
+   ADD_SUBDIRECTORY(Programs)
+ENDIF(BUILD_PROGRAMS)
+
+# Build Testing
+OPTION(BUILD_TESTING "Build the tests" OFF)
+IF(BUILD_TESTING)
+   ADD_SUBDIRECTORY(Testing)
+ENDIF(BUILD_TESTING)
+
+# Build Examples
+OPTION(BUILD_EXAMPLES "Build the examples" ON)
+IF (BUILD_EXAMPLES)
+   ADD_SUBDIRECTORY(Examples)
+ENDIF (BUILD_EXAMPL
