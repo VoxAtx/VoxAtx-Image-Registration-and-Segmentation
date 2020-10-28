@@ -43,4 +43,49 @@ Module:    DifferenceRegistration.cxx
 
 #include <vtkRenderer.h>
 #include <vtkCamera.h>
-#inclu
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkInteractorStyleImage.h>
+#include <vtkImageSlice.h>
+#include <vtkImageStack.h>
+#include <vtkImageResliceMapper.h>
+#include <vtkImageProperty.h>
+#include <vtkImageHistogramStatistics.h>
+#include <vtkImageMathematics.h>
+#include <vtkImageShiftScale.h>
+
+#include <vtkTimerLog.h>
+#include <vtkVersion.h>
+
+#include <vtkImageRegistration.h>
+
+#include <vtksys/SystemTools.hxx>
+
+// A macro to assist VTK 5 backwards compatibility
+#if VTK_MAJOR_VERSION >= 6
+#define SET_INPUT_DATA SetInputData
+#else
+#define SET_INPUT_DATA SetInput
+#endif
+
+// internal methods for reading images, these methods read the image
+// into the specified data object and also provide a matrix for converting
+// the data coordinates into patient coordinates.
+namespace {
+
+#ifdef AIRS_USE_DICOM
+
+void ReadDICOMImage(
+  vtkImageData *data, vtkMatrix4x4 *matrix, const char *directoryName)
+{
+  vtkDICOMReader *reader = vtkDICOMReader::New();
+
+  bool singleFile = true;
+  if (vtksys::SystemTools::FileIsDirectory(directoryName))
+    {
+    // get all the DICOM files in the directory
+    singleFile = false;
+    std::string dirString = directoryName;
+    vtksys::SystemTools::ConvertToUnixSlashes(dirString);
+    vtkSmartPointer<vtkGlobFileNames> glob =
+      vtkS
