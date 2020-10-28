@@ -88,4 +88,51 @@ void ReadDICOMImage(
     std::string dirString = directoryName;
     vtksys::SystemTools::ConvertToUnixSlashes(dirString);
     vtkSmartPointer<vtkGlobFileNames> glob =
-      vtkS
+      vtkSmartPointer<vtkGlobFileNames>::New();
+    glob->SetDirectory(dirString.c_str());
+    glob->AddFileNames("*");
+
+    // sort the files
+    vtkSmartPointer<vtkDICOMFileSorter> sorter =
+      vtkSmartPointer<vtkDICOMFileSorter>::New();
+    sorter->SetInputFileNames(glob->GetFileNames());
+    sorter->Update();
+
+    if (sorter->GetNumberOfSeries() == 0)
+      {
+      fprintf(stderr, "Folder contains no DICOM files: %s\n", directoryName);
+      exit(1);
+      }
+    else if (sorter->GetNumberOfSeries() > 1)
+      {
+      fprintf(stderr, "Folder contains more than one DICOM series: %s\n",
+              directoryName);
+      exit(1);
+      }
+    reader->SetFileNames(sorter->GetFileNamesForSeries(0));
+    }
+  else
+    {
+    // was given a single file instead of a directory
+    reader->SetFileName(directoryName);
+    }
+
+  // For NIfTI coordinate system, use BottomUp
+  reader->SetMemoryRowOrderToFileNative();
+
+  reader->UpdateInformation();
+  if (reader->GetErrorCode())
+    {
+    exit(1);
+    }
+
+  vtkStringArray *stackArray = reader->GetStackIDs();
+  vtkIdType numStacks = stackArray->GetNumberOfValues();
+  for (vtkIdType stackId = 0; stackId+1 < numStacks; stackId++)
+    {
+    // Find the first stack that has more than one image
+    if (reader->GetFileIndexArray()->GetNumberOfTuples() > 1)
+      {
+      break;
+      }
+    reader->SetDesiredStackID(stackAr
