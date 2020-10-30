@@ -135,4 +135,51 @@ void ReadDICOMImage(
       {
       break;
       }
-    reader->SetDesiredStackID(stackAr
+    reader->SetDesiredStackID(stackArray->GetValue(stackId+1));
+    reader->UpdateInformation();
+    }
+
+  if (!singleFile)
+    {
+    // when reading images, only read 1st component if the
+    // image has multiple components or multiple time points
+    vtkIntArray *fileArray = reader->GetFileIndexArray();
+
+    // create a filtered list of files
+    vtkSmartPointer<vtkStringArray> fileNames =
+      vtkSmartPointer<vtkStringArray>::New();
+    vtkIdType n = fileArray->GetNumberOfTuples();
+    for (vtkIdType i = 0; i < n; i++)
+      {
+      std::string newFileName =
+        reader->GetFileNames()->GetValue(fileArray->GetComponent(i, 0));
+      bool alreadyThere = false;
+      vtkIdType m = fileNames->GetNumberOfTuples();
+      for (vtkIdType j = 0; j < m; j++)
+        {
+        if (newFileName == fileNames->GetValue(j))
+          {
+          alreadyThere = true;
+          break;
+          }
+        }
+      if (!alreadyThere)
+        {
+        fileNames->InsertNextValue(newFileName);
+        }
+      }
+    reader->SetFileNames(fileNames);
+    }
+  reader->SetDesiredTimeIndex(0);
+
+  reader->Update();
+  if (reader->GetErrorCode())
+    {
+    exit(1);
+    }
+
+  vtkImageData *image = reader->GetOutput();
+
+  // get the data
+  data->CopyStructure(image);
+  data->GetPoint
