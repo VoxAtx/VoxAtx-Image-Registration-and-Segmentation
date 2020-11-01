@@ -230,4 +230,52 @@ void ReadDICOMImage(
     {
     matrix->Element[i][0] = xdir[i];
     matrix->Element[i][1] = ydir[i];
-    matrix->Elemen
+    matrix->Element[i][2] = zdir[i];
+    matrix->Element[i][3] = position[i];
+    }
+  matrix->Element[3][0] = 0;
+  matrix->Element[3][1] = 0;
+  matrix->Element[3][2] = 0;
+  matrix->Element[3][3] = 1;
+  matrix->Modified();
+}
+
+#endif /* AIRS_USE_DICOM */
+
+void ReadMINCImage(
+  vtkImageData *data, vtkMatrix4x4 *matrix, const char *fileName)
+{
+  // read the image
+  vtkSmartPointer<vtkMINCImageReader> reader =
+    vtkSmartPointer<vtkMINCImageReader>::New();
+
+  reader->SetFileName(fileName);
+  reader->Update();
+
+  double spacing[3];
+  reader->GetOutput()->GetSpacing(spacing);
+  spacing[0] = fabs(spacing[0]);
+  spacing[1] = fabs(spacing[1]);
+  spacing[2] = fabs(spacing[2]);
+
+  // flip the image rows into a DICOM-style ordering
+  vtkSmartPointer<vtkImageReslice> flip =
+    vtkSmartPointer<vtkImageReslice>::New();
+
+  flip->SetInputConnection(reader->GetOutputPort());
+  flip->SetResliceAxesDirectionCosines(
+    -1,0,0, 0,-1,0, 0,0,1);
+  flip->SetOutputSpacing(spacing);
+  flip->Update();
+
+  vtkImageData *image = flip->GetOutput();
+
+  // get the data
+  data->CopyStructure(image);
+  data->GetPointData()->PassData(image->GetPointData());
+
+  // generate the matrix, but modify to use DICOM coords
+  static double xyFlipMatrix[16] =
+    { -1, 0, 0, 0,  0, -1, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1 };
+  // correct for the flip that was done earlier
+  vtkMatrix4x4::Multiply4x4(*reader->GetDirecti
