@@ -321,4 +321,47 @@ void ReadNIFTIImage(
 
   // get the SForm or QForm matrix if present
   static double nMatrix[16] =
-    { 1, 0, 0, 0,  0, 1, 0, 
+    { 1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1 };
+  if (reader->GetSFormMatrix())
+    {
+    vtkMatrix4x4::DeepCopy(nMatrix, reader->GetSFormMatrix());
+    }
+  else if (reader->GetQFormMatrix())
+    {
+    vtkMatrix4x4::DeepCopy(nMatrix, reader->GetQFormMatrix());
+    }
+
+  // generate the matrix, but modify to use DICOM coords
+  static double xyFlipMatrix[16] =
+    { -1, 0, 0, 0,  0, -1, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1 };
+  // correct for the flip that was done earlier
+  vtkMatrix4x4::Multiply4x4(nMatrix, xyFlipMatrix, *matrix->Element);
+  // do the left/right, up/down dicom-to-minc transformation
+  vtkMatrix4x4::Multiply4x4(xyFlipMatrix, *matrix->Element, *matrix->Element);
+  matrix->Modified();
+}
+#endif /* AIRS_USE_NIFTI */
+
+void SetViewFromMatrix(
+  vtkRenderer *renderer,
+  vtkInteractorStyleImage *istyle,
+  vtkMatrix4x4 *matrix)
+{
+  istyle->SetCurrentRenderer(renderer);
+
+  // This view assumes the data uses the DICOM Patient Coordinate System.
+  // It provides a right-is-left view of axial and coronal images
+  double viewRight[4] = { 1.0, 0.0, 0.0, 0.0 };
+  double viewUp[4] = { 0.0, -1.0, 0.0, 0.0 };
+
+  matrix->MultiplyPoint(viewRight, viewRight);
+  matrix->MultiplyPoint(viewUp, viewUp);
+
+  istyle->SetImageOrientation(viewRight, viewUp);
+}
+
+};
+
+void printUsage(const char *cmdname)
+{
+    cout << "Usage 1: " << cmdname << 
