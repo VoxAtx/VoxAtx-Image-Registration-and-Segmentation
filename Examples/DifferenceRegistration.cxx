@@ -364,4 +364,60 @@ void SetViewFromMatrix(
 
 void printUsage(const char *cmdname)
 {
-    cout << "Usage 1: " << cmdname << 
+    cout << "Usage 1: " << cmdname << " --nodisplay -o output.nii source.nii target.nii"
+         << endl;
+    cout << "Usage 2: " << cmdname << " --nodisplay -o output.nii dicomdir1/ dicomdir2/"
+         << endl;
+}
+
+int main (int argc, char *argv[])
+{
+  if (argc < 3)
+    {
+    printUsage(argv[0]);
+    return EXIT_FAILURE;
+    }
+
+  // -------------------------------------------------------
+  // the files
+  int argi = 1;
+  const char *xfmfile = NULL;
+  const char *outputfile = NULL;
+  const char *sourcefile;
+  const char *targetfile;
+  bool display = true;
+
+  if (strcmp(argv[argi], "--nodisplay") == 0)
+    {
+    display = false;
+    argi++;
+    }
+  if (strcmp(argv[argi], "-o") == 0)
+    {
+    if (argc <= argi + 1)
+      {
+      cerr << argv[0] << " : missing output file after -o\n" << endl;
+      return EXIT_FAILURE;
+      }
+    // is the output an xfm file or an image file?
+    xfmfile = argv[argi + 1];
+    argi += 2;
+    size_t m = strlen(xfmfile);
+    if (m < 4 || strcmp(&xfmfile[m-4], ".xfm") != 0)
+      {
+      // it isn't an .xfm file, assume that it is an image file
+      outputfile = xfmfile;
+      xfmfile = NULL;
+      }
+    }
+
+  if (argc <= argi + 1)
+    {
+    printUsage(argv[0]);
+    return EXIT_FAILURE;
+    }
+  targetfile = argv[argi];
+  sourcefile = argv[argi + 1];
+
+  // -------------------------------------------------------
+ 
