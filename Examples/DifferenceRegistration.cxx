@@ -460,4 +460,42 @@ int main (int argc, char *argv[])
   vtkSmartPointer<vtkMatrix4x4> targetMatrix =
     vtkSmartPointer<vtkMatrix4x4>::New();
   n = strlen(targetfile);
-  if (n > 4 && strcmp(&targetfile[n-4], "
+  if (n > 4 && strcmp(&targetfile[n-4], ".mnc") == 0)
+    {
+    ReadMINCImage(targetImage, targetMatrix, targetfile);
+    }
+#ifdef AIRS_USE_NIFTI
+  else if ((n > 4 && strcmp(&targetfile[n-4], ".nii") == 0) ||
+           (n > 7 && strcmp(&targetfile[n-7], ".nii.gz") == 0))
+    {
+    ReadNIFTIImage(targetImage, targetMatrix, targetfile);
+    }
+#endif
+  else
+    {
+    ReadDICOMImage(targetImage, targetMatrix, targetfile);
+    }
+
+  // -------------------------------------------------------
+  // display the images
+
+  vtkSmartPointer<vtkRenderWindow> renderWindow =
+    vtkSmartPointer<vtkRenderWindow>::New();
+  vtkSmartPointer<vtkRenderer> renderer =
+    vtkSmartPointer<vtkRenderer>::New();
+  vtkSmartPointer<vtkRenderWindowInteractor> interactor =
+    vtkSmartPointer<vtkRenderWindowInteractor>::New();
+  vtkSmartPointer<vtkInteractorStyleImage> istyle =
+    vtkSmartPointer<vtkInteractorStyleImage>::New();
+
+  istyle->SetInteractionModeToImageSlicing();
+  interactor->SetInteractorStyle(istyle);
+  renderWindow->SetInteractor(interactor);
+  renderWindow->AddRenderer(renderer);
+
+  vtkSmartPointer<vtkImageSlice> sourceActor =
+    vtkSmartPointer<vtkImageSlice>::New();
+  vtkSmartPointer<vtkImageResliceMapper> sourceMapper =
+    vtkSmartPointer<vtkImageResliceMapper>::New();
+  vtkSmartPointer<vtkImageProperty> sourceProperty =
+    vtkSmartPointer<vtkImagePrope
