@@ -532,4 +532,47 @@ int main (int argc, char *argv[])
   targetMapper->SET_INPUT_DATA(targetImage);
   targetMapper->SliceAtFocalPointOn();
   targetMapper->SliceFacesCameraOn();
-  targetMapper->ResampleToS
+  targetMapper->ResampleToScreenPixelsOff();
+
+  double targetRange[2];
+  autoRange->SET_INPUT_DATA(targetImage);
+  autoRange->Update();
+  autoRange->GetAutoRange(targetRange);
+
+  targetProperty->SetInterpolationTypeToLinear();
+  targetProperty->SetColorWindow((targetRange[1]-targetRange[0]));
+  targetProperty->SetColorLevel(0.5*(targetRange[0]+targetRange[1]));
+
+  targetActor->SetMapper(targetMapper);
+  targetActor->SetProperty(targetProperty);
+  targetActor->SetUserMatrix(targetMatrix);
+
+  vtkSmartPointer<vtkImageStack> imageStack =
+    vtkSmartPointer<vtkImageStack>::New();
+  imageStack->AddImage(targetActor);
+  imageStack->AddImage(sourceActor);
+
+  renderer->AddViewProp(imageStack);
+  renderer->SetBackground(0,0,0);
+
+  renderWindow->SetSize(720,720);
+
+  double bounds[6], center[4];
+  targetImage->GetBounds(bounds);
+  center[0] = 0.5*(bounds[0] + bounds[1]);
+  center[1] = 0.5*(bounds[2] + bounds[3]);
+  center[2] = 0.5*(bounds[4] + bounds[5]);
+  center[3] = 1.0;
+  targetMatrix->MultiplyPoint(center, center);
+
+  vtkCamera *camera = renderer->GetActiveCamera();
+  renderer->ResetCamera();
+  camera->SetFocalPoint(center);
+  camera->ParallelProjectionOn();
+  camera->SetParallelScale(132);
+  SetViewFromMatrix(renderer, istyle, targetMatrix);
+  renderer->ResetCameraClippingRange();
+
+  if (display)
+    {
+    renderWindow->Rend
