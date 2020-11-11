@@ -498,4 +498,38 @@ int main (int argc, char *argv[])
   vtkSmartPointer<vtkImageResliceMapper> sourceMapper =
     vtkSmartPointer<vtkImageResliceMapper>::New();
   vtkSmartPointer<vtkImageProperty> sourceProperty =
-    vtkSmartPointer<vtkImagePrope
+    vtkSmartPointer<vtkImageProperty>::New();
+
+  sourceMapper->SET_INPUT_DATA(sourceImage);
+  sourceMapper->SliceAtFocalPointOn();
+  sourceMapper->SliceFacesCameraOn();
+  sourceMapper->ResampleToScreenPixelsOff();
+
+  double sourceRange[2];
+  vtkSmartPointer<vtkImageHistogramStatistics> autoRange =
+    vtkSmartPointer<vtkImageHistogramStatistics>::New();
+  autoRange->SET_INPUT_DATA(sourceImage);
+  autoRange->Update();
+  autoRange->GetAutoRange(sourceRange);
+
+  sourceProperty->SetInterpolationTypeToLinear();
+  sourceProperty->SetColorWindow((sourceRange[1]-sourceRange[0]));
+  sourceProperty->SetColorLevel(0.5*(sourceRange[0]+sourceRange[1]));
+  sourceProperty->CheckerboardOn();
+  sourceProperty->SetCheckerboardSpacing(40,40);
+
+  sourceActor->SetMapper(sourceMapper);
+  sourceActor->SetProperty(sourceProperty);
+  sourceActor->SetUserMatrix(sourceMatrix);
+
+  vtkSmartPointer<vtkImageSlice> targetActor =
+    vtkSmartPointer<vtkImageSlice>::New();
+  vtkSmartPointer<vtkImageResliceMapper> targetMapper =
+    vtkSmartPointer<vtkImageResliceMapper>::New();
+  vtkSmartPointer<vtkImageProperty> targetProperty =
+    vtkSmartPointer<vtkImageProperty>::New();
+
+  targetMapper->SET_INPUT_DATA(targetImage);
+  targetMapper->SliceAtFocalPointOn();
+  targetMapper->SliceFacesCameraOn();
+  targetMapper->ResampleToS
