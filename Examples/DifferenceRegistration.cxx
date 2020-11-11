@@ -420,4 +420,44 @@ int main (int argc, char *argv[])
   sourcefile = argv[argi + 1];
 
   // -------------------------------------------------------
- 
+  // parameters for registration
+
+  int interpolatorType = vtkImageRegistration::Linear;
+  double transformTolerance = 0.1; // tolerance on transformation result
+  int numberOfBins = 64; // for Mattes' mutual information
+  double initialBlurFactor = 4.0;
+
+  // -------------------------------------------------------
+  // load the images
+
+  int n = 0;
+
+  // Read the source image
+  vtkSmartPointer<vtkImageData> sourceImage =
+    vtkSmartPointer<vtkImageData>::New();
+  vtkSmartPointer<vtkMatrix4x4> sourceMatrix =
+    vtkSmartPointer<vtkMatrix4x4>::New();
+  n = strlen(sourcefile);
+  if (n > 4 && strcmp(&sourcefile[n-4], ".mnc") == 0)
+    {
+    ReadMINCImage(sourceImage, sourceMatrix, sourcefile);
+    }
+#ifdef AIRS_USE_NIFTI
+  else if ((n > 4 && strcmp(&sourcefile[n-4], ".nii") == 0) ||
+           (n > 7 && strcmp(&sourcefile[n-7], ".nii.gz") == 0))
+    {
+    ReadNIFTIImage(sourceImage, sourceMatrix, sourcefile);
+    }
+#endif
+  else
+    {
+    ReadDICOMImage(sourceImage, sourceMatrix, sourcefile);
+    }
+
+  // Read the target image
+  vtkSmartPointer<vtkImageData> targetImage =
+    vtkSmartPointer<vtkImageData>::New();
+  vtkSmartPointer<vtkMatrix4x4> targetMatrix =
+    vtkSmartPointer<vtkMatrix4x4>::New();
+  n = strlen(targetfile);
+  if (n > 4 && strcmp(&targetfile[n-4], "
