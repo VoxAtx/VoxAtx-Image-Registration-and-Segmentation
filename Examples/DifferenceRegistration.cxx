@@ -690,4 +690,53 @@ int main (int argc, char *argv[])
       sourceBlur->SetOutputSpacing(sourceSpacing);
       sourceBlur->Update();
 
-      targetBlu
+      targetBlur->SetInterpolator(0);
+      sourceBlur->InterpolateOff();
+      targetBlur->SetOutputSpacing(targetSpacing);
+      targetBlur->Update();
+      }
+    else
+      {
+      // reduced resolution: set the blurring
+      double spacing[3];
+      for (int j = 0; j < 3; j++)
+        {
+        spacing[j] = blurFactor*minSpacing;
+        if (spacing[j] < sourceSpacing[j])
+          {
+          spacing[j] = sourceSpacing[j];
+          }
+        }
+
+      sourceBlurKernel->SetBlurFactors(
+        spacing[0]/sourceSpacing[0],
+        spacing[1]/sourceSpacing[1],
+        spacing[2]/sourceSpacing[2]);
+
+      sourceBlur->SetOutputSpacing(spacing);
+      sourceBlur->Update();
+
+      targetBlurKernel->SetBlurFactors(
+        blurFactor*minSpacing/targetSpacing[0],
+        blurFactor*minSpacing/targetSpacing[1],
+        blurFactor*minSpacing/targetSpacing[2]);
+
+      targetBlur->Update();
+      }
+
+    if (initialized)
+      {
+      // re-initialize with the matrix from the previous step
+      registration->SetInitializerTypeToNone();
+      matrix->DeepCopy(registration->GetTransform()->GetMatrix());
+      }
+
+    registration->Initialize(matrix);
+
+    initialized = true;
+
+    while (registration->Iterate())
+      {
+      // registration->UpdateRegistration();
+      // will iterate until convergence or failure
+      vtkMatrix4x4
