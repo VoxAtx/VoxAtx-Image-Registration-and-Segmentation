@@ -649,4 +649,45 @@ int main (int argc, char *argv[])
   registration->SetInterpolatorType(interpolatorType);
   registration->SetJointHistogramSize(numberOfBins,numberOfBins);
   registration->SetCostTolerance(1e-4);
-  registrati
+  registration->SetTransformTolerance(transformTolerance);
+  registration->SetMaximumNumberOfIterations(500);
+
+  // -------------------------------------------------------
+  // make a timer
+  vtkSmartPointer<vtkTimerLog> timer =
+    vtkSmartPointer<vtkTimerLog>::New();
+  double startTime = timer->GetUniversalTime();
+  double lastTime = startTime;
+
+  // -------------------------------------------------------
+  // do the registration
+
+  // the registration starts at low-resolution
+  double blurFactor = initialBlurFactor;
+  // two stages for each resolution:
+  // first without interpolation, and then with interpolation
+  int stage = 0;
+  // will be set to "true" when registration is initialized
+  bool initialized = false;
+
+  for (;;)
+    {
+    if (stage == 0)
+      {
+      registration->SetInterpolatorTypeToNearest();
+      registration->SetTransformTolerance(minSpacing*blurFactor);
+      }
+    else
+      {
+      registration->SetInterpolatorType(interpolatorType);
+      registration->SetTransformTolerance(transformTolerance*blurFactor);
+      }
+    if (blurFactor < 1.1)
+      {
+      // full resolution: no blurring or resampling
+      sourceBlur->SetInterpolator(0);
+      sourceBlur->InterpolateOff();
+      sourceBlur->SetOutputSpacing(sourceSpacing);
+      sourceBlur->Update();
+
+      targetBlu
