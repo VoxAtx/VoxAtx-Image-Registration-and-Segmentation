@@ -575,4 +575,47 @@ int main (int argc, char *argv[])
 
   if (display)
     {
-    renderWindow->Rend
+    renderWindow->Render();
+    }
+
+  // -------------------------------------------------------
+  // prepare for registration
+
+  // get information about the images
+  double targetSpacing[3], sourceSpacing[3];
+  targetImage->GetSpacing(targetSpacing);
+  sourceImage->GetSpacing(sourceSpacing);
+
+  for (int jj = 0; jj < 3; jj++)
+    {
+    targetSpacing[jj] = fabs(targetSpacing[jj]);
+    sourceSpacing[jj] = fabs(sourceSpacing[jj]);
+    }
+
+  double minSpacing = sourceSpacing[0];
+  if (minSpacing > sourceSpacing[1])
+    {
+    minSpacing = sourceSpacing[1];
+    }
+  if (minSpacing > sourceSpacing[2])
+    {
+    minSpacing = sourceSpacing[2];
+    }
+
+  // blur source image with Blackman-windowed sinc
+  vtkSmartPointer<vtkImageSincInterpolator> sourceBlurKernel =
+    vtkSmartPointer<vtkImageSincInterpolator>::New();
+  sourceBlurKernel->SetWindowFunctionToBlackman();
+
+  // reduce the source resolution
+  vtkSmartPointer<vtkImageResize> sourceBlur =
+    vtkSmartPointer<vtkImageResize>::New();
+  sourceBlur->SET_INPUT_DATA(sourceImage);
+  sourceBlur->SetResizeMethodToOutputSpacing();
+  sourceBlur->SetInterpolator(sourceBlurKernel);
+  sourceBlur->InterpolateOn();
+
+  // blur target with Blackman-windowed sinc
+  vtkSmartPointer<vtkImageSincInterpolator> targetBlurKernel =
+    vtkSmartPointer<vtkImageSincInterpolator>::New();
+  
