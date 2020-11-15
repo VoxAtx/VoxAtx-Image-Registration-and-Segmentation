@@ -618,4 +618,35 @@ int main (int argc, char *argv[])
   // blur target with Blackman-windowed sinc
   vtkSmartPointer<vtkImageSincInterpolator> targetBlurKernel =
     vtkSmartPointer<vtkImageSincInterpolator>::New();
-  
+  targetBlurKernel->SetWindowFunctionToBlackman();
+
+  // keep target at full resolution
+  vtkSmartPointer<vtkImageResize> targetBlur =
+    vtkSmartPointer<vtkImageResize>::New();
+  targetBlur->SET_INPUT_DATA(targetImage);
+  targetBlur->SetResizeMethodToOutputSpacing();
+  targetBlur->SetInterpolator(targetBlurKernel);
+  targetBlur->InterpolateOn();
+
+  // get the initial transformation
+  vtkSmartPointer<vtkMatrix4x4> matrix =
+    vtkSmartPointer<vtkMatrix4x4>::New();
+  matrix->DeepCopy(targetMatrix);
+  matrix->Invert();
+  vtkMatrix4x4::Multiply4x4(matrix, sourceMatrix, matrix);
+
+  // set up the registration
+  vtkSmartPointer<vtkImageRegistration> registration =
+    vtkSmartPointer<vtkImageRegistration>::New();
+  registration->SetTargetImageInputConnection(targetBlur->GetOutputPort());
+  registration->SetSourceImageInputConnection(sourceBlur->GetOutputPort());
+  registration->SetInitializerTypeToCentered();
+  registration->SetTransformTypeToRigid();
+  //registration->SetTransformTypeToScaleTargetAxes();
+  //registration->SetTransformTypeToAffine();
+  registration->SetMetricTypeToNormalizedMutualInformation();
+  //registration->SetMetricTypeToNormalizedCrossCorrelation();
+  registration->SetInterpolatorType(interpolatorType);
+  registration->SetJointHistogramSize(numberOfBins,numberOfBins);
+  registration->SetCostTolerance(1e-4);
+  registrati
