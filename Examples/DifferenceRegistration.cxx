@@ -739,4 +739,48 @@ int main (int argc, char *argv[])
       {
       // registration->UpdateRegistration();
       // will iterate until convergence or failure
-      vtkMatrix4x4
+      vtkMatrix4x4::Multiply4x4(
+        targetMatrix,registration->GetTransform()->GetMatrix(),sourceMatrix);
+      sourceMatrix->Modified();
+      if (display)
+        {
+        interactor->Render();
+        }
+      }
+
+    double newTime = timer->GetUniversalTime();
+    cout << "blur " << blurFactor << " stage " << stage << " took "
+         << (newTime - lastTime) << "s and "
+         << registration->GetNumberOfEvaluations() << " evaluations" << endl;
+    lastTime = newTime;
+
+    // prepare for next iteration
+    if (stage == 1)
+      {
+      blurFactor /= 2.0;
+      if (blurFactor < 0.9)
+        {
+        break;
+        }
+      }
+    stage = (stage + 1) % 2;
+    }
+
+  cout << "registration took " << (lastTime - startTime) << "s" << endl;
+
+  // -------------------------------------------------------
+  // write the output matrix
+  if (xfmfile)
+    {
+    vtkSmartPointer<vtkMNITransformWriter> writer =
+      vtkSmartPointer<vtkMNITransformWriter>::New();
+    writer->SetFileName(xfmfile);
+    writer->SetTransform(registration->GetTransform());
+    writer->Update();
+    }
+
+  // -------------------------------------------------------
+  // do the subtraction
+  double iScale =
+    (targetRange[1] - targetRange[0])/(sourceRange[1] - sourceRange[0]);
+  double iShift = 0.0; //targetRange[0]/iScal
