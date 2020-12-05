@@ -783,4 +783,38 @@ int main (int argc, char *argv[])
   // do the subtraction
   double iScale =
     (targetRange[1] - targetRange[0])/(sourceRange[1] - sourceRange[0]);
-  double iShift = 0.0; //targetRange[0]/iScal
+  double iShift = 0.0; //targetRange[0]/iScale - sourceRange[0];
+
+  vtkSmartPointer<vtkImageSincInterpolator> sincInterpolator =
+    vtkSmartPointer<vtkImageSincInterpolator>::New();
+  sincInterpolator->SetWindowFunctionToBlackman();
+
+  vtkSmartPointer<vtkImageReslice> resample =
+    vtkSmartPointer<vtkImageReslice>::New();
+  resample->SET_INPUT_DATA(sourceImage);
+  resample->SetInformationInput(targetImage);
+  resample->SetInterpolator(sincInterpolator);
+  registration->GetTransform()->GetMatrix()->Print(cerr);
+  resample->SetResliceTransform(registration->GetTransform()->GetInverse());
+  resample->Update();
+
+  vtkSmartPointer<vtkImageShiftScale> shiftScale =
+    vtkSmartPointer<vtkImageShiftScale>::New();
+  shiftScale->SetShift(iShift);
+  shiftScale->SetScale(iScale);
+  shiftScale->SET_INPUT_DATA(resample->GetOutput());
+  shiftScale->ClampOverflowOn();
+  shiftScale->Update();
+
+  vtkSmartPointer<vtkImageMathematics> difference =
+    vtkSmartPointer<vtkImageMathematics>::New();
+  difference->SetOperationToSubtract();
+  difference->SET_INPUT_DATA(0, shiftScale->GetOutput());
+  difference->SET_INPUT_DATA(1, targetImage);
+  difference->Update();
+
+  sourceMapper->SET_INPUT_DATA(difference->GetOutput());
+
+  double differenceRange[2];
+  autoRange->SET_INPUT_DATA(difference->GetOutput());
+  autoRange->Update(
