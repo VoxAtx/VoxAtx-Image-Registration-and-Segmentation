@@ -817,4 +817,43 @@ int main (int argc, char *argv[])
 
   double differenceRange[2];
   autoRange->SET_INPUT_DATA(difference->GetOutput());
-  autoRange->Update(
+  autoRange->Update();
+  autoRange->GetAutoRange(differenceRange);
+  differenceRange[0] = 0.0;
+
+  sourceProperty->SetInterpolationTypeToLinear();
+  sourceProperty->SetColorWindow((differenceRange[1]-differenceRange[0]));
+  sourceProperty->SetColorLevel(0.5*(differenceRange[0]+differenceRange[1]));
+  sourceProperty->CheckerboardOff();
+
+#ifdef AIRS_USE_NIFTI
+  // -------------------------------------------------------
+  // write the subtracted image
+  if (outputfile)
+    {
+    double outputSpacing[3];
+    difference->GetOutput()->GetSpacing(outputSpacing);
+    outputSpacing[0] = fabs(outputSpacing[0]);
+    outputSpacing[1] = fabs(outputSpacing[1]);
+    outputSpacing[2] = fabs(outputSpacing[2]);
+
+    // first, flip the image rows into a DICOM-style ordering
+    vtkSmartPointer<vtkImageReslice> flip =
+      vtkSmartPointer<vtkImageReslice>::New();
+    flip->SetInputConnection(difference->GetOutputPort());
+    flip->SetResliceAxesDirectionCosines(
+      -1,0,0, 0,-1,0, 0,0,1);
+    flip->SetOutputSpacing(outputSpacing);
+    flip->Update();
+
+    // next, write the image
+    vtkSmartPointer<vtkNIFTIWriter> writer =
+      vtkSmartPointer<vtkNIFTIWriter>::New();
+    writer->SetInputConnection(flip->GetOutputPort());
+    writer->SetQFormMatrix(targetMatrix);
+    writer->SetFileName(outputfile);
+    writer->Write();
+    }
+#endif
+
+  // -------------------------------------------
