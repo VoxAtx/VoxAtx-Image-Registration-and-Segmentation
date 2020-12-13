@@ -1,17 +1,28 @@
+
 /*=========================================================================
 
 Program:   Atamai Image Registration and Segmentation
-Module:    DifferenceRegistration.cxx
+Module:    RigidImageRegistration.cxx
 
    This software is distributed WITHOUT ANY WARRANTY; without even the
    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 =========================================================================*/
 
-// This example registers two images (assumed to be of the same patient)
-// and then subtracts first image from the second.
+// This example demonstrates rigid registration of images.  Since it is a
+// rigid registration, the expectation is that the images come from the
+// same patient.
 
-#include "AIRSConfig.h"
+// Two image file formats are supported for this example: MINC and DICOM.
+// DICOM images are read with the troublesome vtkDICOMImageReader, which
+// may get the slice spacing or ordering wrong, or even fail to read the
+// images altogether.
+
+// Image registration is done first on a blurred, low-resolution version of
+// the image before being done on the full resolution image, and is also
+// done first with no interpolation before being done with linear interpolation.
+// This multi-stage approach increases the robustness and often the speed of
+// the registration.
 
 #include <vtkSmartPointer.h>
 
@@ -23,23 +34,10 @@ Module:    DifferenceRegistration.cxx
 #include <vtkMatrix4x4.h>
 #include <vtkTransform.h>
 #include <vtkMath.h>
-#include <vtkGlobFileNames.h>
-#include <vtkIntArray.h>
-#include <vtkStringArray.h>
 
 #include <vtkMINCImageReader.h>
-#include <vtkDICOMImageReader.h>
 #include <vtkMNITransformWriter.h>
-
-// optional readers
-#ifdef AIRS_USE_DICOM
-#define AIRS_USE_NIFTI
-#include <vtkNIFTIReader.h>
-#include <vtkNIFTIWriter.h>
-#include <vtkDICOMReader.h>
-#include <vtkDICOMFileSorter.h>
-#include <vtkDICOMMetaData.h>
-#endif
+#include <vtkDICOMImageReader.h>
 
 #include <vtkRenderer.h>
 #include <vtkCamera.h>
@@ -50,16 +48,20 @@ Module:    DifferenceRegistration.cxx
 #include <vtkImageStack.h>
 #include <vtkImageResliceMapper.h>
 #include <vtkImageProperty.h>
-#include <vtkImageHistogramStatistics.h>
-#include <vtkImageMathematics.h>
-#include <vtkImageShiftScale.h>
 
 #include <vtkTimerLog.h>
 #include <vtkVersion.h>
 
-#include <vtkImageRegistration.h>
+#include "AIRSConfig.h"
+#include "vtkITKXFMWriter.h"
+#include "vtkImageRegistration.h"
 
-#include <vtksys/SystemTools.hxx>
+// optional readers
+#ifdef AIRS_USE_DICOM
+#define AIRS_USE_NIFTI
+#include <vtkNIFTIReader.h>
+#include <vtkDICOMReader.h>
+#endif
 
 // A macro to assist VTK 5 backwards compatibility
 #if VTK_MAJOR_VERSION >= 6
@@ -72,125 +74,6 @@ Module:    DifferenceRegistration.cxx
 // into the specified data object and also provide a matrix for converting
 // the data coordinates into patient coordinates.
 namespace {
-
-#ifdef AIRS_USE_DICOM
-
-void ReadDICOMImage(
-  vtkImageData *data, vtkMatrix4x4 *matrix, const char *directoryName)
-{
-  vtkDICOMReader *reader = vtkDICOMReader::New();
-
-  bool singleFile = true;
-  if (vtksys::SystemTools::FileIsDirectory(directoryName))
-    {
-    // get all the DICOM files in the directory
-    singleFile = false;
-    std::string dirString = directoryName;
-    vtksys::SystemTools::ConvertToUnixSlashes(dirString);
-    vtkSmartPointer<vtkGlobFileNames> glob =
-      vtkSmartPointer<vtkGlobFileNames>::New();
-    glob->SetDirectory(dirString.c_str());
-    glob->AddFileNames("*");
-
-    // sort the files
-    vtkSmartPointer<vtkDICOMFileSorter> sorter =
-      vtkSmartPointer<vtkDICOMFileSorter>::New();
-    sorter->SetInputFileNames(glob->GetFileNames());
-    sorter->Update();
-
-    if (sorter->GetNumberOfSeries() == 0)
-      {
-      fprintf(stderr, "Folder contains no DICOM files: %s\n", directoryName);
-      exit(1);
-      }
-    else if (sorter->GetNumberOfSeries() > 1)
-      {
-      fprintf(stderr, "Folder contains more than one DICOM series: %s\n",
-              directoryName);
-      exit(1);
-      }
-    reader->SetFileNames(sorter->GetFileNamesForSeries(0));
-    }
-  else
-    {
-    // was given a single file instead of a directory
-    reader->SetFileName(directoryName);
-    }
-
-  // For NIfTI coordinate system, use BottomUp
-  reader->SetMemoryRowOrderToFileNative();
-
-  reader->UpdateInformation();
-  if (reader->GetErrorCode())
-    {
-    exit(1);
-    }
-
-  vtkStringArray *stackArray = reader->GetStackIDs();
-  vtkIdType numStacks = stackArray->GetNumberOfValues();
-  for (vtkIdType stackId = 0; stackId+1 < numStacks; stackId++)
-    {
-    // Find the first stack that has more than one image
-    if (reader->GetFileIndexArray()->GetNumberOfTuples() > 1)
-      {
-      break;
-      }
-    reader->SetDesiredStackID(stackArray->GetValue(stackId+1));
-    reader->UpdateInformation();
-    }
-
-  if (!singleFile)
-    {
-    // when reading images, only read 1st component if the
-    // image has multiple components or multiple time points
-    vtkIntArray *fileArray = reader->GetFileIndexArray();
-
-    // create a filtered list of files
-    vtkSmartPointer<vtkStringArray> fileNames =
-      vtkSmartPointer<vtkStringArray>::New();
-    vtkIdType n = fileArray->GetNumberOfTuples();
-    for (vtkIdType i = 0; i < n; i++)
-      {
-      std::string newFileName =
-        reader->GetFileNames()->GetValue(fileArray->GetComponent(i, 0));
-      bool alreadyThere = false;
-      vtkIdType m = fileNames->GetNumberOfTuples();
-      for (vtkIdType j = 0; j < m; j++)
-        {
-        if (newFileName == fileNames->GetValue(j))
-          {
-          alreadyThere = true;
-          break;
-          }
-        }
-      if (!alreadyThere)
-        {
-        fileNames->InsertNextValue(newFileName);
-        }
-      }
-    reader->SetFileNames(fileNames);
-    }
-  reader->SetDesiredTimeIndex(0);
-
-  reader->Update();
-  if (reader->GetErrorCode())
-    {
-    exit(1);
-    }
-
-  vtkImageData *image = reader->GetOutput();
-
-  // get the data
-  data->CopyStructure(image);
-  data->GetPointData()->PassData(image->GetPointData());
-
-  // get the matrix
-  matrix->DeepCopy(reader->GetPatientMatrix());
-
-  return;
-}
-
-#else /* AIRS_USE_DICOM */
 
 void ReadDICOMImage(
   vtkImageData *data, vtkMatrix4x4 *matrix, const char *directoryName)
@@ -239,8 +122,6 @@ void ReadDICOMImage(
   matrix->Element[3][3] = 1;
   matrix->Modified();
 }
-
-#endif /* AIRS_USE_DICOM */
 
 void ReadMINCImage(
   vtkImageData *data, vtkMatrix4x4 *matrix, const char *fileName)
@@ -342,6 +223,7 @@ void ReadNIFTIImage(
 }
 #endif /* AIRS_USE_NIFTI */
 
+
 void SetViewFromMatrix(
   vtkRenderer *renderer,
   vtkInteractorStyleImage *istyle,
@@ -364,9 +246,9 @@ void SetViewFromMatrix(
 
 void printUsage(const char *cmdname)
 {
-    cout << "Usage 1: " << cmdname << " --nodisplay -o output.nii source.nii target.nii"
+    cout << "Usage 1: " << cmdname << " --nodisplay -o output.xfm source.mnc target.mnc"
          << endl;
-    cout << "Usage 2: " << cmdname << " --nodisplay -o output.nii dicomdir1/ dicomdir2/"
+    cout << "Usage 2: " << cmdname << " --nodisplay -o output.xfm dicomdir1/ dicomdir2/"
          << endl;
 }
 
@@ -382,7 +264,6 @@ int main (int argc, char *argv[])
   // the files
   int argi = 1;
   const char *xfmfile = NULL;
-  const char *outputfile = NULL;
   const char *sourcefile;
   const char *targetfile;
   bool display = true;
@@ -396,18 +277,19 @@ int main (int argc, char *argv[])
     {
     if (argc <= argi + 1)
       {
-      cerr << argv[0] << " : missing output file after -o\n" << endl;
+      cerr << argv[0] << " : missing .xfm file after -o\n" << endl;
       return EXIT_FAILURE;
       }
-    // is the output an xfm file or an image file?
     xfmfile = argv[argi + 1];
     argi += 2;
     size_t m = strlen(xfmfile);
-    if (m < 4 || strcmp(&xfmfile[m-4], ".xfm") != 0)
+    if (m < 4 ||
+        ((strcmp(&xfmfile[m-4], ".xfm") != 0) &&
+         (strcmp(&xfmfile[m-4], ".tfm") != 0) &&
+         (strcmp(&xfmfile[m-4], ".txt") != 0)))
       {
-      // it isn't an .xfm file, assume that it is an image file
-      outputfile = xfmfile;
-      xfmfile = NULL;
+      cerr << argv[0] << " : transform file must end in .xfm, .tfm, or .txt\n";
+      return EXIT_FAILURE;
       }
     }
 
@@ -416,8 +298,8 @@ int main (int argc, char *argv[])
     printUsage(argv[0]);
     return EXIT_FAILURE;
     }
-  targetfile = argv[argi];
-  sourcefile = argv[argi + 1];
+  sourcefile = argv[argi];
+  targetfile = argv[argi + 1];
 
   // -------------------------------------------------------
   // parameters for registration
@@ -506,12 +388,7 @@ int main (int argc, char *argv[])
   sourceMapper->ResampleToScreenPixelsOff();
 
   double sourceRange[2];
-  vtkSmartPointer<vtkImageHistogramStatistics> autoRange =
-    vtkSmartPointer<vtkImageHistogramStatistics>::New();
-  autoRange->SET_INPUT_DATA(sourceImage);
-  autoRange->Update();
-  autoRange->GetAutoRange(sourceRange);
-
+  sourceImage->GetScalarRange(sourceRange);
   sourceProperty->SetInterpolationTypeToLinear();
   sourceProperty->SetColorWindow((sourceRange[1]-sourceRange[0]));
   sourceProperty->SetColorLevel(0.5*(sourceRange[0]+sourceRange[1]));
@@ -535,10 +412,7 @@ int main (int argc, char *argv[])
   targetMapper->ResampleToScreenPixelsOff();
 
   double targetRange[2];
-  autoRange->SET_INPUT_DATA(targetImage);
-  autoRange->Update();
-  autoRange->GetAutoRange(targetRange);
-
+  targetImage->GetScalarRange(targetRange);
   targetProperty->SetInterpolationTypeToLinear();
   targetProperty->SetColorWindow((targetRange[1]-targetRange[0]));
   targetProperty->SetColorLevel(0.5*(targetRange[0]+targetRange[1]));
@@ -641,11 +515,14 @@ int main (int argc, char *argv[])
   registration->SetTargetImageInputConnection(targetBlur->GetOutputPort());
   registration->SetSourceImageInputConnection(sourceBlur->GetOutputPort());
   registration->SetInitializerTypeToCentered();
+  //registration->SetTransformDimensionalityTo2D();
   registration->SetTransformTypeToRigid();
   //registration->SetTransformTypeToScaleTargetAxes();
   //registration->SetTransformTypeToAffine();
+  //registration->SetMetricTypeToSquaredDifference();
   registration->SetMetricTypeToNormalizedMutualInformation();
   //registration->SetMetricTypeToNormalizedCrossCorrelation();
+  //registration->SetMetricTypeToNeighborhoodCorrelation();
   registration->SetInterpolatorType(interpolatorType);
   registration->SetJointHistogramSize(numberOfBins,numberOfBins);
   registration->SetCostTolerance(1e-4);
@@ -772,89 +649,24 @@ int main (int argc, char *argv[])
   // write the output matrix
   if (xfmfile)
     {
-    vtkSmartPointer<vtkMNITransformWriter> writer =
-      vtkSmartPointer<vtkMNITransformWriter>::New();
-    writer->SetFileName(xfmfile);
-    writer->SetTransform(registration->GetTransform());
-    writer->Update();
+    size_t l = strlen(xfmfile);
+    if (l >= 4 && strcmp(xfmfile + (l - 4), ".xfm") == 0)
+      {
+      vtkSmartPointer<vtkMNITransformWriter> writer =
+        vtkSmartPointer<vtkMNITransformWriter>::New();
+      writer->SetFileName(xfmfile);
+      writer->SetTransform(registration->GetTransform());
+      writer->Update();
+      }
+    else
+      {
+      vtkSmartPointer<vtkITKXFMWriter> writer =
+        vtkSmartPointer<vtkITKXFMWriter>::New();
+      writer->SetFileName(xfmfile);
+      writer->SetTransform(registration->GetTransform());
+      writer->Write();
+      }
     }
-
-  // -------------------------------------------------------
-  // do the subtraction
-  double iScale =
-    (targetRange[1] - targetRange[0])/(sourceRange[1] - sourceRange[0]);
-  double iShift = 0.0; //targetRange[0]/iScale - sourceRange[0];
-
-  vtkSmartPointer<vtkImageSincInterpolator> sincInterpolator =
-    vtkSmartPointer<vtkImageSincInterpolator>::New();
-  sincInterpolator->SetWindowFunctionToBlackman();
-
-  vtkSmartPointer<vtkImageReslice> resample =
-    vtkSmartPointer<vtkImageReslice>::New();
-  resample->SET_INPUT_DATA(sourceImage);
-  resample->SetInformationInput(targetImage);
-  resample->SetInterpolator(sincInterpolator);
-  registration->GetTransform()->GetMatrix()->Print(cerr);
-  resample->SetResliceTransform(registration->GetTransform()->GetInverse());
-  resample->Update();
-
-  vtkSmartPointer<vtkImageShiftScale> shiftScale =
-    vtkSmartPointer<vtkImageShiftScale>::New();
-  shiftScale->SetShift(iShift);
-  shiftScale->SetScale(iScale);
-  shiftScale->SET_INPUT_DATA(resample->GetOutput());
-  shiftScale->ClampOverflowOn();
-  shiftScale->Update();
-
-  vtkSmartPointer<vtkImageMathematics> difference =
-    vtkSmartPointer<vtkImageMathematics>::New();
-  difference->SetOperationToSubtract();
-  difference->SET_INPUT_DATA(0, shiftScale->GetOutput());
-  difference->SET_INPUT_DATA(1, targetImage);
-  difference->Update();
-
-  sourceMapper->SET_INPUT_DATA(difference->GetOutput());
-
-  double differenceRange[2];
-  autoRange->SET_INPUT_DATA(difference->GetOutput());
-  autoRange->Update();
-  autoRange->GetAutoRange(differenceRange);
-  differenceRange[0] = 0.0;
-
-  sourceProperty->SetInterpolationTypeToLinear();
-  sourceProperty->SetColorWindow((differenceRange[1]-differenceRange[0]));
-  sourceProperty->SetColorLevel(0.5*(differenceRange[0]+differenceRange[1]));
-  sourceProperty->CheckerboardOff();
-
-#ifdef AIRS_USE_NIFTI
-  // -------------------------------------------------------
-  // write the subtracted image
-  if (outputfile)
-    {
-    double outputSpacing[3];
-    difference->GetOutput()->GetSpacing(outputSpacing);
-    outputSpacing[0] = fabs(outputSpacing[0]);
-    outputSpacing[1] = fabs(outputSpacing[1]);
-    outputSpacing[2] = fabs(outputSpacing[2]);
-
-    // first, flip the image rows into a DICOM-style ordering
-    vtkSmartPointer<vtkImageReslice> flip =
-      vtkSmartPointer<vtkImageReslice>::New();
-    flip->SetInputConnection(difference->GetOutputPort());
-    flip->SetResliceAxesDirectionCosines(
-      -1,0,0, 0,-1,0, 0,0,1);
-    flip->SetOutputSpacing(outputSpacing);
-    flip->Update();
-
-    // next, write the image
-    vtkSmartPointer<vtkNIFTIWriter> writer =
-      vtkSmartPointer<vtkNIFTIWriter>::New();
-    writer->SetInputConnection(flip->GetOutputPort());
-    writer->SetQFormMatrix(targetMatrix);
-    writer->SetFileName(outputfile);
-    writer->Write();
-    }
-#endif
 
   // -------------------------------------------------------
   // allow user to interact
