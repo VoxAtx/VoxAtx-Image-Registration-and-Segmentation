@@ -1503,3 +1503,349 @@ bool PositionFrame(
   double centre[3];
   centre[0] = 0.5*(extent[0] + extent[1])*spacing[0] + origin[0];
   centre[1] = 0.5*(extent[2] + extent[3])*spacing[1] + origin[1];
+  centre[2] = 0.5*(extent[4] + extent[5])*spacing[2] + origin[2];
+
+  // create an initial matrix
+  BuildMatrix(xvec, yvec, zvec, centre, frameCentre, direction, matrix);
+
+  // find the side plates of the leksell frame
+  Selector xSelector(blobs, xvec);
+  if (!xSelector.SelectTwo(plateSeparationX/spacing[0],
+                           plateClusterThreshold*xSelector.GetAverage(),
+                           clusterWidthX))
+    {
+    return false;
+    }
+  std::vector<Selector::Cluster> *xClusters = xSelector.GetClusters();
+
+  // for computing min and max slice for side plates
+  int zMin = 10000;
+  int zMax = -1;
+
+  // for storing the blobs that belong to each of the side plates
+  std::vector<Blob> plateBlobs[4];
+
+  // find the blobs that are within the side-plate clusters,
+  // or within plus or minus one pixel of these clusters
+  for (std::vector<Blob>::iterator it = blobs->begin();
+       it != blobs->end();
+       ++it)
+    {
+    for (int j = 0; j < 2; j++)
+      {
+      double x = it->x;
+      int xIdx = static_cast<int>(x > 0 ? x + 0.5 : x - 0.5);
+      if (xIdx >= (*xClusters)[j].lowest &&
+          xIdx <= (*xClusters)[j].highest)
+        {
+        zMin = (zMin < it->slice ? zMin : it->slice);
+        zMax = (zMax > it->slice ? zMax : it->slice);
+        plateBlobs[j].push_back(*it);
+        break;
+        }
+      }
+    }
+
+  // we will be chopping 10% from the top and bottom of the plates
+  // in order to better capture each fiducial bar in isolation from
+  // other bars
+  double zLow = (zMin + (zMax - zMin)*0.1)*spacing[2] + origin[2];
+  double zHigh = (zMax - (zMax - zMin)*0.1)*spacing[2] + origin[2];
+
+  // direction perpendicular to the diagonal bars
+  double dvec[3];
+  dvec[0] = 0.0;
+  dvec[1] = sqrt(0.5);
+  dvec[2] = -sqrt(0.5)*spacing[2]/spacing[1]*direction[1]*direction[2];
+
+  // find the bars for each of the side plates
+  FiducialPlate plates[4];
+  bool foundPlate[4];
+  for (int j = 0; j < 2; j++)
+    {
+    foundPlate[j] = plates[j].LocateBars(
+      &plateBlobs[j], yvec, dvec, origin, spacing, barSeparation/spacing[1],
+      barClusterThreshold, clusterWidth, zLow, zHigh);
+    }
+
+  if (!foundPlate[0] || !foundPlate[1])
+    {
+    return false;
+    }
+
+  // will be computing the intersection points at the corners of the
+  // plates and the average direction of the vertical bars
+  double centres[4][3];
+  double verticals[4][3];
+
+  for (int j = 0; j < 2; j++)
+    {
+    plates[j].GetLocation(centres[j], verticals[j]);
+
+    // get all of the points that make up the plate fiducials
+    for (int k = 0; k < 3; k++)
+      {
+      FiducialBar *bar = &plates[j].GetBars()[k];
+      std::vector<Point> *barPoints = bar->GetPoints();
+      points->insert(points->end(), barPoints->begin(), barPoints->end());
+      }
+    }
+
+  // find the blobs within which to search for front/back plates
+  double ycentre = 0.5*(centres[0][1] + centres[1][1]);
+  double yPlatePos[2];
+  yPlatePos[0] = ycentre - 0.5*plateSeparationY;
+  yPlatePos[1] = ycentre + 0.5*plateSeparationY;
+  double yPlateRange[2][2];
+  yPlateRange[0][0] = (yPlatePos[0]-0.5*clusterWidth - origin[1])/spacing[1];
+  yPlateRange[0][1] = (yPlatePos[0]+0.5*clusterWidth - origin[1])/spacing[1];
+  yPlateRange[1][0] = (yPlatePos[1]-0.5*clusterWidth - origin[1])/spacing[1];
+  yPlateRange[1][1] = (yPlatePos[1]+0.5*clusterWidth - origin[1])/spacing[1];
+
+  std::vector<Blob> yBlobs[2];
+  for (std::vector<Blob>::iterator it = blobs->begin();
+       it != blobs->end();
+       ++it)
+    {
+    for (int j = 0; j < 2; j++)
+      {
+      if (it->y > yPlateRange[j][0] && it->y < yPlateRange[j][1])
+        {
+        yBlobs[j].push_back(*it);
+        break;
+        }
+      }
+    }
+
+  dvec[0] = sqrt(0.5);
+  dvec[1] = 0.0;
+  dvec[2] = -sqrt(0.5)*spacing[2]/spacing[0]*direction[0]*direction[2];
+
+  Selector ySelectorLow(&yBlobs[0], yvec);
+  Selector ySelectorHigh(&yBlobs[1], yvec);
+  Selector *ySelector[2];
+  ySelector[0] = &ySelectorLow;
+  ySelector[1] = &ySelectorHigh;
+
+  for (int j = 0; j < 2; j++)
+    {
+    if ((useAP && useAP[j] == 0) ||
+        !ySelector[j]->SelectOne(
+          (yPlatePos[j] - origin[1])/spacing[1],
+          plateClusterThreshold*xSelector.GetAverage(), clusterWidthY))
+      {
+      foundPlate[2+j] = false;
+      continue;
+      }
+    std::vector<Selector::Cluster> *yClusters = ySelector[j]->GetClusters();
+
+    for (std::vector<Blob>::iterator it = yBlobs[j].begin();
+         it != yBlobs[j].end();
+         ++it)
+      {
+      double y = it->y;
+      int yIdx = static_cast<int>(y > 0 ? y + 0.5 : y - 0.5);
+      if (yIdx >= (*yClusters)[0].lowest &&
+          yIdx <= (*yClusters)[0].highest)
+        {
+        plateBlobs[2+j].push_back(*it);
+        }
+      }
+
+    foundPlate[2+j] = plates[2+j].LocateBars(
+      &plateBlobs[2+j], xvec, dvec, origin, spacing,
+      barSeparation/spacing[0],
+      barClusterThreshold, clusterWidth, zLow, zHigh);
+
+    if (foundPlate[2+j])
+      {
+      // compute the location of this plate
+      plates[2+j].GetLocation(centres[2+j], verticals[2+j]);
+
+      // get the points that belong to the plate fiducials
+      for (int k = 0; k < 3; k++)
+        {
+        FiducialBar *bar = &plates[2+j].GetBars()[k];
+        std::vector<Point> *barPoints = bar->GetPoints();
+        points->insert(points->end(), barPoints->begin(), barPoints->end());
+        }
+      }
+    }
+
+  // compute the initial z vector from the side plates
+  zvec[0] = verticals[0][0] + verticals[1][0];
+  zvec[1] = verticals[0][1] + verticals[1][1];
+  zvec[2] = verticals[0][2] + verticals[1][2];
+
+  // compute the left-right direction from side plates
+  xvec[0] = centres[1][0] - centres[0][0];
+  xvec[1] = centres[1][1] - centres[0][1];
+  xvec[2] = centres[1][2] - centres[0][2];
+
+  // compute the center in data coordinates from side plates
+  centre[0] = 0.5*(centres[0][0] + centres[1][0]);
+  centre[1] = 0.5*(centres[0][1] + centres[1][1]);
+  centre[2] = 0.5*(centres[0][2] + centres[1][2]);
+
+  // improve result with front/back plates if present
+  if (foundPlate[2] && foundPlate[3])
+    {
+    // weigh results according to proximity to centre
+    double a = plateSeparationY/(plateSeparationX + plateSeparationY);
+    double b = plateSeparationX/(plateSeparationX + plateSeparationY);
+
+    centre[0] = a*centre[0] + b*0.5*(centres[2][0] + centres[3][0]);
+    centre[1] = a*centre[1] + b*0.5*(centres[2][1] + centres[3][1]);
+    centre[2] = a*centre[2] + b*0.5*(centres[2][2] + centres[3][2]);
+
+    yvec[0] = centres[3][0] - centres[2][0];
+    yvec[1] = centres[3][1] - centres[2][1];
+    yvec[2] = centres[3][2] - centres[2][2];
+    }
+  else if (foundPlate[2] || foundPlate[3])
+    {
+    int k = (foundPlate[2] ? 2 : 3);
+
+    double offset[3];
+    offset[0] = centres[k][0] - centre[0];
+    offset[1] = centres[k][1] - centre[1];
+    offset[2] = centres[k][2] - centre[2];
+
+    // compute offset along the z direction
+    vtkMath::Normalize(zvec);
+    double d = vtkMath::Dot(zvec, offset);
+    // weigh results according to proximity to centre, also note that
+    // there are 2 side plates but 1 anterior or posterior plate
+    d *= plateSeparationX/(plateSeparationX + 2*plateSeparationY);
+    centre[0] += d*zvec[0];
+    centre[1] += d*zvec[1];
+    centre[2] += d*zvec[2];
+
+    // given just one anterior or posterior plate, we should not attempt to
+    // compute yvec from the plate centres.  Compute it from zvec instead
+    vtkMath::Cross(zvec, xvec, yvec);
+    }
+  else
+    {
+    // if front/back plates are missing, use zvec to compute yvec
+    vtkMath::Cross(zvec, xvec, yvec);
+    }
+
+  // create the frame registration matrix
+  BuildMatrix(xvec, yvec, zvec, centre, frameCentre, direction, matrix);
+
+  return true;
+}
+
+} // end anonymous namespace
+
+//----------------------------------------------------------------------------
+//----------------------------------------------------------------------------
+int vtkFrameFinder::FindFrame(
+  vtkImageData *image, vtkPolyData *poly,
+  const double direction[2], vtkMatrix4x4 *m4x4)
+{
+  double spacing[3], origin[3];
+  int extent[6];
+  image->GetSpacing(spacing);
+  image->GetOrigin(origin);
+  image->GetExtent(extent);
+
+  bool useAP[2];
+  if (direction[1] < 0)
+    {
+    useAP[0] = (this->UseAnteriorFiducial != 0);
+    useAP[1] = (this->UsePosteriorFiducial != 0);
+    }
+  else
+    {
+    useAP[0] = (this->UseAnteriorFiducial != 0);
+    useAP[1] = (this->UsePosteriorFiducial != 0);
+    }
+
+  std::vector<Blob> blobs;
+  std::vector<Point> framePoints;
+
+  UpdateBlobs(image, &blobs);
+
+  double matrix[16];
+  this->Success = PositionFrame(
+    &blobs, &framePoints, extent, origin, spacing, direction, useAP, matrix);
+
+  m4x4->DeepCopy(matrix);
+
+  if (poly)
+    {
+    // generate the frame data
+    vtkSmartPointer<vtkPoints> points;
+    vtkSmartPointer<vtkFloatArray> scalars =
+      vtkSmartPointer<vtkFloatArray>::New();
+    vtkSmartPointer<vtkFloatArray> vectors =
+      vtkSmartPointer<vtkFloatArray>::New();
+    vectors->SetNumberOfComponents(3);
+    if (poly->GetPoints())
+      {
+      points = poly->GetPoints();
+      }
+    else
+      {
+      points = vtkSmartPointer<vtkPoints>::New();
+      }
+
+    vtkSmartPointer<vtkCellArray> cells =
+      vtkSmartPointer<vtkCellArray>::New();
+    cells->InsertNextCell(0);
+    vtkIdType numVerts = 0;
+
+    // activate this to see all the blobs, not just frame blobs
+    // (for debugging purposes only)
+#if 0
+    points->SetNumberOfPoints(0);
+    for (std::vector<Blob>::iterator it = blobs.begin();
+         it != blobs.end();
+         ++it)
+      {
+      double point[3];
+      point[0] = origin[0] + it->x*spacing[0];
+      point[1] = origin[1] + it->y*spacing[1];
+      point[2] = origin[2] + it->slice*spacing[2];
+      vtkIdType ptId = points->InsertNextPoint(point);
+      cells->InsertCellPoint(ptId);
+      float s = it->val;
+      float r = sqrt(it->count/3.14159);
+      float v[3] = { r, r, 1.0 };
+      scalars->InsertNextTuple(&s);
+      vectors->InsertNextTuple(v);
+      //cout << "blob " << numVerts << " " << point[0] << " " << point[1] << " " << point[2] << "\n";
+      numVerts++;
+      }
+
+    cells->UpdateCellCount(numVerts);
+    poly->SetPoints(points);
+    poly->SetVerts(cells);
+    poly->GetPointData()->SetScalars(scalars);
+    poly->GetPointData()->SetVectors(vectors);
+    }
+#else
+    for (std::vector<Point>::iterator it = framePoints.begin();
+         it != framePoints.end();
+         ++it)
+      {
+      vtkIdType ptId = points->InsertNextPoint(it->x, it->y, it->z);
+      cells->InsertCellPoint(ptId);
+      numVerts++;
+      }
+
+    cells->UpdateCellCount(numVerts);
+    poly->SetPoints(points);
+    poly->SetVerts(cells);
+    }
+#endif
+
+  if (!this->Success)
+    {
+    vtkErrorMacro("Failed to find the Leksell frame in the image.");
+    }
+
+  return this->Success;
+}
