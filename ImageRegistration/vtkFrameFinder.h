@@ -56,4 +56,33 @@ public:
   void PrintSelf(ostream& os, vtkIndent indent);
 
   // Description:
-  // The input to this filter sho
+  // The input to this filter should be an image of a head with a
+  // stereotactic frame.  Axial images are required.  Call Update()
+  // in order to compute the registration matrix.
+  void SetInputData(vtkDataObject *);
+  void SetInput(vtkDataObject *o) { this->SetInputData(o); }
+  vtkDataObject *GetInput();
+
+  // Description:
+  // The first output of this filter is a polydata that contains all
+  // of the points in the image that were identified as being part of
+  // the frame fiducials.  The second output is a wireframe model of
+  // the frame fiducials.  If the frame-finding algorithm succeeded,
+  // then the ImageToFrameMatrix can be used to transform the found
+  // points onto the frame model.
+  vtkPolyData *GetOutput(int i);
+  vtkPolyData *GetOutput() { return this->GetOutput(0); }
+
+  // Description:
+  // Get a boolean value that indicates whether
+  bool GetSuccess() { return this->Success; }
+
+  // Description:
+  // Specify whether to use the anterior and posterior fiducials.
+  // By default both of these are on, but sometimes these plates
+  // are not securely fastened and therefore not reliable.  The
+  // default is to use them if they are detected in the image.
+  vtkGetMacro(UseAnteriorFiducial, int);
+  vtkSetMacro(UseAnteriorFiducial, int);
+  vtkBooleanMacro(UseAnteriorFiducial, int);
+  v
