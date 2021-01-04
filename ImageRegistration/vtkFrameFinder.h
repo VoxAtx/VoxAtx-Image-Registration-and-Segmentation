@@ -85,4 +85,36 @@ public:
   vtkGetMacro(UseAnteriorFiducial, int);
   vtkSetMacro(UseAnteriorFiducial, int);
   vtkBooleanMacro(UseAnteriorFiducial, int);
-  v
+  vtkGetMacro(UsePosteriorFiducial, int);
+  vtkSetMacro(UsePosteriorFiducial, int);
+  vtkBooleanMacro(UsePosteriorFiducial, int);
+
+  // Description:
+  // Set the matrix that converts image data coordinates into DICOM
+  // patient coordinates.  Only the first two columns of this matrix
+  // are used, which must be set from the ImageOrientationPatient
+  // metadata.
+  void SetDICOMPatientMatrix(vtkMatrix4x4 *matrix);
+
+  // Description:
+  // After this filter has been updated, this provides the transformation
+  // from image data coordinates to frame coordinates.
+  vtkMatrix4x4 *GetImageToFrameMatrix() {
+    return this->ImageToFrameMatrix; }
+
+protected:
+  vtkFrameFinder();
+  ~vtkFrameFinder();
+
+  // Functions overridden from Superclass
+  virtual int ProcessRequest(vtkInformation *,
+                             vtkInformationVector **,
+                             vtkInformationVector *);
+  virtual int RequestData(vtkInformation *,
+			  vtkInformationVector **,
+			  vtkInformationVector *);
+  virtual int RequestUpdateExtent(vtkInformation *vtkNotUsed(request),
+                                 vtkInformationVector **inInfo,
+                                 vtkInformationVector *vtkNotUsed(outInfo));
+  virtual int RequestInformation(vtkInformation *vtkNotUsed(request),
+                           
