@@ -1004,3 +1004,447 @@ int vtkITKXFMReader::AddTransform(
           parameters, fixedParameters, 3, 2, classname))
       {
       double angle = parameters->GetValue(0);
+      translation[0] = parameters->GetValue(1);
+      translation[1] = parameters->GetValue(2);
+      center[0] = fixedParameters->GetValue(0);
+      center[1] = fixedParameters->GetValue(1);
+      vtkITKXFMReader::MatrixFromAngle(angle, matparms);
+      }
+    }
+  else if (strcmp(classname, "Similarity2DTransform") == 0)
+    {
+    if (this->CheckNumberOfParameters(
+          parameters, fixedParameters, 4, 2, classname))
+      {
+      double scale = parameters->GetValue(0);
+      double angle = parameters->GetValue(1);
+      translation[0] = parameters->GetValue(2);
+      translation[1] = parameters->GetValue(3);
+      center[0] = fixedParameters->GetValue(0);
+      center[1] = fixedParameters->GetValue(1);
+      vtkITKXFMReader::MatrixFromAngle(angle, matparms);
+      matparms[0] *= scale;
+      matparms[1] *= scale;
+      matparms[3] *= scale;
+      matparms[4] *= scale;
+      }
+    }
+  else if (strcmp(classname, "CenteredRigid2DTransform") == 0)
+    {
+    if (this->CheckNumberOfParameters(
+          parameters, fixedParameters, 5, 2, classname))
+      {
+      double angle = parameters->GetValue(0);
+      center[0] = fixedParameters->GetValue(1);
+      center[1] = fixedParameters->GetValue(2);
+      translation[0] = parameters->GetValue(3);
+      translation[1] = parameters->GetValue(4);
+      vtkITKXFMReader::MatrixFromAngle(angle, matparms);
+      }
+    }
+  else if (strcmp(classname, "CenteredSimilarity2DTransform") == 0)
+    {
+    if (this->CheckNumberOfParameters(
+          parameters, fixedParameters, 6, 2, classname))
+      {
+      double scale = parameters->GetValue(0);
+      double angle = parameters->GetValue(1);
+      center[0] = parameters->GetValue(2);
+      center[1] = parameters->GetValue(3);
+      translation[0] = parameters->GetValue(4);
+      translation[1] = parameters->GetValue(5);
+      vtkITKXFMReader::MatrixFromAngle(angle, matparms);
+      matparms[0] *= scale;
+      matparms[1] *= scale;
+      matparms[3] *= scale;
+      matparms[4] *= scale;
+      }
+    }
+  else if (strcmp(classname, "CenteredEuler3DTransform") == 0)
+    {
+    if (this->CheckNumberOfParameters(
+          parameters, fixedParameters, 9, 3, classname))
+      {
+      double xyz[3];
+      for (int i = 0; i < 3; i++)
+        {
+        xyz[i] = parameters->GetValue(i);
+        center[i] = parameters->GetValue(3 + i);
+        translation[i] = parameters->GetValue(6 + i);
+        }
+      vtkITKXFMReader::MatrixFromEuler(xyz, matparms);
+      }
+    }
+  else if (strcmp(classname, "VersorTransform") == 0)
+    {
+    if (this->CheckNumberOfParameters(
+          parameters, fixedParameters, 3, 3, classname))
+      {
+      double versor[3];
+      for (int i = 0; i < 3; i++)
+        {
+        versor[i] = parameters->GetValue(i);
+        center[i] = fixedParameters->GetValue(i);
+        }
+      vtkITKXFMReader::MatrixFromVersor(versor, matparms);
+      }
+    }
+  else if (strcmp(classname, "VersorRigid3DTransform") == 0)
+    {
+    if (this->CheckNumberOfParameters(
+          parameters, fixedParameters, 6, 3, classname))
+      {
+      double versor[3];
+      for (int i = 0; i < 3; i++)
+        {
+        versor[i] = parameters->GetValue(i);
+        translation[i] = parameters->GetValue(3 + i);
+        center[i] = fixedParameters->GetValue(i);
+        }
+      vtkITKXFMReader::MatrixFromVersor(versor, matparms);
+      }
+    }
+  else if (strcmp(classname, "Similarity3DTransform") == 0)
+    {
+    if (this->CheckNumberOfParameters(
+          parameters, fixedParameters, 7, 3, classname))
+      {
+      double versor[3];
+      for (int i = 0; i < 3; i++)
+        {
+        versor[i] = parameters->GetValue(i);
+        translation[i] = parameters->GetValue(3 + i);
+        center[i] = fixedParameters->GetValue(i);
+        }
+      vtkITKXFMReader::MatrixFromVersor(versor, matparms);
+      double scale = parameters->GetValue(6);
+      for (int j = 0; j < 9; j++)
+        {
+        matparms[j] *= scale;
+        }
+      }
+    }
+  else if (strcmp(classname, "ScaleVersor3DTransform") == 0)
+    {
+    if (this->CheckNumberOfParameters(
+          parameters, fixedParameters, 9, 3, classname))
+      {
+      double versor[3];
+      double scale[3];
+      for (int i = 0; i < 3; i++)
+        {
+        versor[i] = parameters->GetValue(i);
+        translation[i] = parameters->GetValue(3 + i);
+        scale[i] = parameters->GetValue(6 + i);
+        center[i] = fixedParameters->GetValue(i);
+        }
+      vtkITKXFMReader::MatrixFromVersor(versor, matparms);
+      // just duplicating what ITK does...
+      matparms[0] += scale[0] - 1.0;
+      matparms[4] += scale[1] - 1.0;
+      matparms[8] += scale[2] - 1.0;
+      }
+    }
+  else if (strcmp(classname, "ScaleSkewVersor3DTransform") == 0)
+    {
+    if (this->CheckNumberOfParameters(
+          parameters, fixedParameters, 15, 3, classname))
+      {
+      double versor[3];
+      double scale[3];
+      double skew[6];
+      for (int i = 0; i < 3; i++)
+        {
+        versor[i] = parameters->GetValue(i);
+        translation[i] = parameters->GetValue(3 + i);
+        scale[i] = parameters->GetValue(6 + i);
+        skew[i] = parameters->GetValue(9 + i);
+        skew[i+3] = parameters->GetValue(12 + i);
+        center[i] = fixedParameters->GetValue(i);
+        }
+      vtkITKXFMReader::MatrixFromVersor(versor, matparms);
+      matparms[0] += scale[0] - 1.0;
+      matparms[1] += skew[0];
+      matparms[2] += skew[1];
+      matparms[3] += skew[2];
+      matparms[4] += scale[1] - 1.0;
+      matparms[5] += skew[3];
+      matparms[6] += skew[4];
+      matparms[7] += skew[5];
+      matparms[8] += scale[2] - 1.0;
+      }
+    }
+  else if (strcmp(classname, "QuaternionRigidTransform") == 0)
+    {
+    if (this->CheckNumberOfParameters(
+          parameters, fixedParameters, 7, 3, classname))
+      {
+      double quat[4];
+      quat[0] = parameters->GetValue(3);
+
+      for (int i = 0; i < 3; i++)
+        {
+        quat[i+1] = parameters->GetValue(i);
+        translation[i] = parameters->GetValue(4 + i);
+        center[i] = fixedParameters->GetValue(i);
+        }
+      vtkITKXFMReader::MatrixFromQuaternion(quat, matparms);
+      }
+    }
+
+  else
+    {
+    // unrecognized transform, set parameters but do nothing else
+    this->CheckNumberOfParameters(
+      parameters, fixedParameters, 0, 0, classname);
+
+    vtkWarningMacro("Unrecognized transform type \'"
+                    << classname << "\', using identity matrix.");
+    }
+
+  vtkITKXFMReader::BuildTransform(
+    matparms, translation, center, transform);
+
+  this->Transforms->AddItem(transform);
+
+  return (this->ErrorIndicator == 0);
+}
+
+//-------------------------------------------------------------------------
+int vtkITKXFMReader::ReadTextFile()
+{
+  this->Transforms->RemoveAllItems();
+  this->TransformParameters->RemoveAllItems();
+  this->TransformNames->Reset();
+  this->ErrorIndicator = 0;
+
+  // Check that the file name has been set.
+  if (!this->FileName || this->FileName[0] == '\0')
+    {
+    vtkErrorMacro("ReadTextFile: No file name has been set");
+    return 0;
+    }
+
+  // Make sure that the file exists.
+  struct stat fs;
+  if(stat(this->FileName, &fs) != 0)
+    {
+    vtkErrorMacro("ReadTextFile: Can't open file " << this->FileName);
+    return 0;
+    }
+
+  // Make sure that the file is readable.
+  ifstream infile(this->FileName);
+
+  if (infile.fail())
+    {
+    vtkErrorMacro("ReadTextFile: Can't read the file " << this->FileName);
+    return 0;
+    }
+
+  // Read the first line
+  char linetext[ITKXFM_MAXLINE];
+  this->LineNumber = 0;
+  this->ReadLine(infile, linetext);
+
+  if (strncmp(linetext, "#Insight Transform File", 23) != 0)
+    {
+    vtkErrorMacro("ReadTextFile: File is not an ITK transform file: " << this->FileName);
+    infile.close();
+    return 0;
+    }
+
+  // Read the transforms
+  while (infile.good())
+    {
+    if (this->ReadTextTransform(infile, linetext) == 0)
+      {
+      this->Transforms->RemoveAllItems();
+      infile.close();
+      return 0;
+      }
+    this->ReadLine(infile, linetext);
+    }
+
+  // Close the file
+  infile.close();
+
+  return this->CreateOutputTransform();
+}
+
+//-------------------------------------------------------------------------
+int vtkITKXFMReader::CreateOutputTransform()
+{
+  // Create the output transform.
+  int n = this->Transforms->GetNumberOfItems();
+  if (n == 1)
+    {
+    this->SetTransform(
+      static_cast<vtkAbstractTransform *>(
+        this->Transforms->GetItemAsObject(0)));
+    }
+  else
+    {
+    // Determine whether the full transform is linear
+    int linear = 1;
+    int i = 0;
+    for (i = 0; i < n; i++)
+      {
+      if (!vtkLinearTransform::SafeDownCast(
+            this->Transforms->GetItemAsObject(i)))
+        {
+        linear = 0;
+        break;
+        }
+      }
+
+    // If linear, use vtkTransform to concatenate,
+    // else use vtkGeneralTransform.
+    if (linear)
+      {
+      vtkTransform *transform = vtkTransform::New();
+      transform->PostMultiply();
+      for (i = 0; i < n; i++)
+        {
+        vtkLinearTransform *linearTransform =
+          static_cast<vtkLinearTransform *>(
+            this->Transforms->GetItemAsObject(i));
+        transform->Concatenate(linearTransform->GetMatrix());
+        }
+      this->SetTransform(transform);
+      transform->Delete();
+      }
+    else
+      {
+      vtkGeneralTransform *transform = vtkGeneralTransform::New();
+      transform->PostMultiply();
+      for (i = 0; i < n; i++)
+        {
+        vtkAbstractTransform *abstractTransform =
+          (vtkAbstractTransform *)this->Transforms->GetItemAsObject(i);
+        vtkLinearTransform *linearTransform =
+          vtkLinearTransform::SafeDownCast(abstractTransform);
+        if (linearTransform)
+          {
+          transform->Concatenate(linearTransform->GetMatrix());
+          }
+        else
+          {
+          transform->Concatenate(abstractTransform);
+          }
+        }
+      }
+    }
+
+  return 1;
+}
+
+//-------------------------------------------------------------------------
+int vtkITKXFMReader::ProcessRequest(vtkInformation *request,
+                                    vtkInformationVector **inputVector,
+                                    vtkInformationVector *outputVector)
+{
+  if (request->Has(vtkDemandDrivenPipeline::REQUEST_DATA()))
+    {
+    if (vtkITKXFMReader::IsMatFile(this->FileName))
+      {
+      return this->ReadMatFile();
+      }
+    else
+      {
+      return this->ReadTextFile();
+      }
+    }
+
+  return this->Superclass::ProcessRequest(request, inputVector, outputVector);
+}
+
+//-------------------------------------------------------------------------
+void vtkITKXFMReader::SetTransform(vtkAbstractTransform *transform)
+{
+  if (this->Transform != transform)
+    {
+    if (strcmp(transform->GetClassName(),
+               this->Transform->GetClassName()) == 0)
+      {
+      this->Transform->DeepCopy(transform);
+      }
+    else
+      {
+      this->Transform->Delete();
+      transform->Register(this);
+      this->Transform = transform;
+      }
+    }
+}
+
+//-------------------------------------------------------------------------
+vtkAbstractTransform *vtkITKXFMReader::GetTransform()
+{
+  this->Update();
+
+  return this->Transform;
+}
+
+//-------------------------------------------------------------------------
+int vtkITKXFMReader::GetNumberOfTransforms()
+{
+  this->Update();
+
+  return this->Transforms->GetNumberOfItems();
+}
+
+//-------------------------------------------------------------------------
+vtkAbstractTransform *vtkITKXFMReader::GetNthTransform(int i)
+{
+  this->Update();
+
+  if (i < 0 || i >= this->Transforms->GetNumberOfItems())
+    {
+    return 0;
+    }
+
+  return static_cast<vtkAbstractTransform *>(
+    this->Transforms->GetItemAsObject(i));
+}
+
+//-------------------------------------------------------------------------
+vtkDoubleArray *vtkITKXFMReader::GetNthTransformParameters(int i)
+{
+  this->Update();
+
+  if (i < 0 || i >= this->TransformParameters->GetNumberOfItems()/2)
+    {
+    return 0;
+    }
+
+  return static_cast<vtkDoubleArray *>(
+    this->TransformParameters->GetItemAsObject(2*i));
+}
+
+//-------------------------------------------------------------------------
+vtkDoubleArray *vtkITKXFMReader::GetNthTransformFixedParameters(int i)
+{
+  this->Update();
+
+  if (i < 0 || i >= this->TransformParameters->GetNumberOfItems()/2)
+    {
+    return 0;
+    }
+
+  return static_cast<vtkDoubleArray *>(
+    this->TransformParameters->GetItemAsObject(2*i + 1));
+}
+
+//-------------------------------------------------------------------------
+const char *vtkITKXFMReader::GetNthTransformName(int i)
+{
+  this->Update();
+
+  if (i < 0 || i >= this->TransformNames->GetNumberOfValues())
+    {
+    return 0;
+    }
+
+  return this->TransformNames->GetValue(i);
+}
