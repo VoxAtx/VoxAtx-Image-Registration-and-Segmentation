@@ -117,4 +117,25 @@ protected:
                                  vtkInformationVector **inInfo,
                                  vtkInformationVector *vtkNotUsed(outInfo));
   virtual int RequestInformation(vtkInformation *vtkNotUsed(request),
-                           
+                                 vtkInformationVector **inInfo,
+                                 vtkInformationVector *vtkNotUsed(outInfo));
+  virtual int FillInputPortInformation(int port, vtkInformation* info);
+  virtual int FillOutputPortInformation(int port, vtkInformation* info);
+
+  int FindFrame(vtkImageData *, vtkPolyData *,
+                const double direction[3], vtkMatrix4x4 *matrix);
+
+  vtkMatrix4x4 *ImageToFrameMatrix;
+  vtkMatrix4x4 *DICOMPatientMatrix;
+
+  bool Success;
+  int UseAnteriorFiducial;
+  int UsePosteriorFiducial;
+
+private:
+  // Copy constructor and assigment operator are purposely not implemented
+  vtkFrameFinder(const vtkFrameFinder&);
+  void operator=(const vtkFrameFinder&);
+};
+
+#endif //__vtkFrameFinder_h
