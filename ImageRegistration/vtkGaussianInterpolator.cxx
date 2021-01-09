@@ -1312,3 +1312,81 @@ void vtkGaussianInterpolator::BuildKernelLookupTable()
       for (int j = 0; j < 4; j++)
         {
         delete [] ktemp[j];
+        }
+      }
+#endif
+
+    int cutoff = static_cast<int>(this->RadiusFactors[i]*b/p + 0.5);
+    cutoff = (cutoff < size ? cutoff : size);
+    cutoff += 1;
+    if (this->KernelType == VTK_APPLEDORN10_INTERPOLATION)
+      {
+      vtkGaussKernel::D10(kernel[i], cutoff, p);
+      }
+    else if (this->KernelType == VTK_APPLEDORN6_INTERPOLATION)
+      {
+      vtkGaussKernel::D6(kernel[i], cutoff, p);
+      }
+    else if (this->KernelType == VTK_APPLEDORN2_INTERPOLATION)
+      {
+      vtkGaussKernel::D2(kernel[i], cutoff, p);
+      }
+    else
+      {
+      vtkGaussKernel::D0(kernel[i], cutoff, p);
+      }
+
+    // add a tail of zeros for when table is interpolated
+    float *kptr = &kernel[i][cutoff];
+    int k = size + 4 - cutoff;
+    do
+      {
+      *kptr++ = 0;
+      }
+    while (--k);
+
+    // renormalize the table if requested
+    if (this->Renormalization)
+      {
+      vtkRenormalizeKernel(kernel[i], VTK_GAUSS_KERNEL_TABLE_DIVISIONS, m);
+      }
+    else if (b > 1.0)
+      {
+      // if kernel stretched to create blur, divide by stretch factor
+      float *ktmp = kernel[i];
+      float bf = 1.0/b;
+      int j = size + 4;
+      do
+        {
+        *ktmp *= bf;
+        ktmp++;
+        }
+      while (--j);
+      }
+    }
+
+  this->KernelLookupTable[0] = kernel[0];
+  this->KernelLookupTable[1] = kernel[1];
+  this->KernelLookupTable[2] = kernel[2];
+
+  this->LastBlurFactors[0] = this->BlurFactors[0];
+  this->LastBlurFactors[1] = this->BlurFactors[1];
+  this->LastBlurFactors[2] = this->BlurFactors[2];
+}
+
+//----------------------------------------------------------------------------
+void vtkGaussianInterpolator::FreeKernelLookupTable()
+{
+  float *kernel = this->KernelLookupTable[0];
+  if (kernel)
+    {
+    delete [] kernel;
+    for (int i = 1; i < 3; i++)
+      {
+      if (this->KernelLookupTable[i] != kernel)
+        {
+        delete [] this->KernelLookupTable[i];
+        }
+      }
+    }
+}
