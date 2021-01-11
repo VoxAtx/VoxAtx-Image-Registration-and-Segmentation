@@ -53,4 +53,56 @@ POSSIBILITY OF SUCH DAMAGES.
 #include <ctype.h>
 #include <stdio.h>
 
-#if !defined(_WIN32
+#if !defined(_WIN32) || defined(__CYGWIN__)
+# include <unistd.h> /* unlink */
+#else
+# include <io.h> /* unlink */
+#endif
+
+#include <stack>
+
+//--------------------------------------------------------------------------
+vtkStandardNewMacro(vtkITKXFMWriter);
+
+//-------------------------------------------------------------------------
+vtkITKXFMWriter::vtkITKXFMWriter()
+{
+  this->FileName = 0;
+  this->Transform = 0;
+  this->TransformCenter[0] = 0.0;
+  this->TransformCenter[1] = 0.0;
+  this->TransformCenter[2] = 0.0;
+  this->Transforms = vtkCollection::New();
+}
+
+//-------------------------------------------------------------------------
+vtkITKXFMWriter::~vtkITKXFMWriter()
+{
+  if (this->Transforms)
+    {
+    this->Transforms->Delete();
+    }
+  if (this->Transform)
+    {
+    this->Transform->Delete();
+    }
+  if (this->FileName)
+    {
+    delete [] this->FileName;
+    }
+}
+
+//-------------------------------------------------------------------------
+void vtkITKXFMWriter::PrintSelf(ostream& os, vtkIndent indent)
+{
+  this->Superclass::PrintSelf(os,indent);
+
+  os << indent << "FileName: "
+     << (this->FileName ? this->FileName : "none") << "\n";
+  os << indent << "Transform: " << this->Transform << "\n";
+  if (this->Transform)
+    {
+    this->Transform->PrintSelf(os, indent.GetNextIndent());
+    }
+  os << indent << "TransformCenter: "
+     << this-
