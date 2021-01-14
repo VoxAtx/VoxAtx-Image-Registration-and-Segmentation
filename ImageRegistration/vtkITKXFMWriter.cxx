@@ -152,4 +152,45 @@ int vtkITKXFMWriter::WriteLinearTransform(
       0x00,0x00,0x00,0x00, // type is IEEE little endian
       0x0C,0x00,0x00,0x00, // 12 rows
       0x01,0x00,0x00,0x00, // 1 column
-      0x00,0x00,0x00,0x00, // double-pr
+      0x00,0x00,0x00,0x00, // double-precision
+      0x1b,0x00,0x00,0x00  // array name is 27 bytes (with null)
+    };
+
+    for (int j = 0; j < 2; j++)
+      {
+      // first iteration writes the parameters,
+      // second iteration writes the fixed parameters
+      double *dp = (j == 0 ? p : c);
+      const char *name = (j == 0 ? "AffineTransform_double_3_3" : "fixed");
+      int n = (j == 0 ? 12 : 3);
+      int m = static_cast<int>(strlen(name) + 1);
+      head[4] = n;
+      head[16] = m;
+
+      outfile.write(head, 20);
+      outfile.write(name, m);
+
+      for (int k = 0; k < n; k++)
+        {
+        // write little-endian double-precision
+        union { double d; unsigned long long l; } u;
+        u.d = dp[k];
+        unsigned long long l = u.l;
+        char op[8];
+        op[0] = static_cast<unsigned char>(l);
+        op[1] = static_cast<unsigned char>(l >> 8);
+        op[2] = static_cast<unsigned char>(l >> 16);
+        op[3] = static_cast<unsigned char>(l >> 24);
+        l >>= 32;
+        op[4] = static_cast<unsigned char>(l);
+        op[5] = static_cast<unsigned char>(l >> 8);
+        op[6] = static_cast<unsigned char>(l >> 16);
+        op[7] = static_cast<unsigned char>(l >> 24);
+        outfile.write(op, 8);
+        }
+      }
+    }
+  else
+    {
+    // write the transform as text
+    outfile << "
