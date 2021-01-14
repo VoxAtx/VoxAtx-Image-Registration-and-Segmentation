@@ -105,4 +105,51 @@ void vtkITKXFMWriter::PrintSelf(ostream& os, vtkIndent indent)
     this->Transform->PrintSelf(os, indent.GetNextIndent());
     }
   os << indent << "TransformCenter: "
-     << this-
+     << this->TransformCenter[0] << " "
+     << this->TransformCenter[1] << " "
+     << this->TransformCenter[2] << "\n";
+  os << indent << "NumberOfTransforms: "
+     << this->Transforms->GetNumberOfItems() << "\n";
+}
+
+//-------------------------------------------------------------------------
+int vtkITKXFMWriter::WriteLinearTransform(
+  ostream &outfile, vtkHomogeneousTransform *transform)
+{
+  vtkMatrix4x4 *matrix = transform->GetMatrix();
+
+  if (matrix->GetElement(3,0) != 0.0 ||
+      matrix->GetElement(3,1) != 0.0 ||
+      matrix->GetElement(3,2) != 0.0 ||
+      matrix->GetElement(3,3) != 1.0)
+    {
+    vtkErrorMacro("WriteLinearTransform: The transform is not linear");
+    return 0;
+    }
+
+  double c[4] = { 0.0, 0.0, 0.0, 1.0 };
+  this->GetTransformCenter(c);
+  double t[4];
+  matrix->MultiplyPoint(c, t);
+  t[0] -= c[0];
+  t[1] -= c[1];
+  t[2] -= c[2];
+
+  double p[12];
+  for (int i = 0; i < 3; i++)
+    {
+    for (int j = 0; j < 3; j++)
+      {
+      p[3*i + j] =  matrix->GetElement(i, j);
+      }
+    p[9 + i] = t[i];
+    }
+
+  if (vtkITKXFMWriter::IsMatFile(this->FileName))
+    {
+    // write the transform as a Matlab Level 4 file, little endian
+    char head[20] = {
+      0x00,0x00,0x00,0x00, // type is IEEE little endian
+      0x0C,0x00,0x00,0x00, // 12 rows
+      0x01,0x00,0x00,0x00, // 1 column
+      0x00,0x00,0x00,0x00, // double-pr
