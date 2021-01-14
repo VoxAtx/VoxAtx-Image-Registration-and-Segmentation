@@ -193,4 +193,61 @@ int vtkITKXFMWriter::WriteLinearTransform(
   else
     {
     // write the transform as text
-    outfile << "
+    outfile << "Transform: MatrixOffsetTransformBase_double_3_3\n";
+
+    outfile << "Parameters:";
+
+    outfile.precision(15);
+
+    for (int k = 0; k < 12; k++)
+      {
+      outfile << " " << p[k];
+      }
+    outfile << "\n";
+
+    outfile << "FixedParameters:";
+    outfile << " " << c[0] << " " << c[1] << " " << c[2];
+
+    outfile << "\n";
+    }
+
+  return 1;
+}
+
+//-------------------------------------------------------------------------
+int vtkITKXFMWriter::WriteTransform(
+  ostream &outfile, vtkAbstractTransform *transform)
+{
+  if (transform->IsA("vtkHomogeneousTransform"))
+    {
+    return this->WriteLinearTransform(
+      outfile, (vtkHomogeneousTransform *)transform);
+    }
+
+  vtkErrorMacro("Unsupported transform type "
+                << transform->GetClassName());
+
+  return 0;
+}
+
+//-------------------------------------------------------------------------
+int vtkITKXFMWriter::WriteFile()
+{
+  // Check that a transform has been set.
+  if (!this->Transform)
+    {
+    vtkErrorMacro("WriteFile: No input transform has been set.");
+    return 0;
+    }
+  // Check that the file name has been set.
+  if (!this->FileName)
+    {
+    vtkErrorMacro("WriteFile: No file name has been set.");
+    return 0;
+    }
+
+  // Is this a matlab file?
+  bool isMat = vtkITKXFMWriter::IsMatFile(this->FileName);
+
+  // Open the file.
+  ofstr
