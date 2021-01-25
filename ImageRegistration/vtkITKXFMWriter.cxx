@@ -299,4 +299,58 @@ int vtkITKXFMWriter::WriteFile()
       // Write all other kinds of transforms
       if (!isMat)
         {
-        outfile << "#Transform " << count <<
+        outfile << "#Transform " << count << "\n";
+        }
+      status = this->WriteTransform(outfile, transform);
+      count++;
+      }
+    }
+
+  outfile.close();
+
+  if (status == 0)
+    {
+    unlink(this->FileName);
+    }
+
+  return status;
+}
+
+//-------------------------------------------------------------------------
+int vtkITKXFMWriter::ProcessRequest(vtkInformation *request,
+                                    vtkInformationVector **inputVector,
+                                    vtkInformationVector *outputVector)
+{
+  if (request->Has(vtkDemandDrivenPipeline::REQUEST_DATA()))
+    {
+    if (this->Transform)
+      {
+      this->Transform->Update();
+      }
+    int n = this->Transforms->GetNumberOfItems();
+    for (int i = 0; i < n; i++)
+      {
+      ((vtkAbstractTransform *)this->Transforms->GetItemAsObject(i))
+        ->Update();
+      }
+    return this->WriteFile();
+    }
+
+  return this->Superclass::ProcessRequest(request, inputVector, outputVector);
+}
+
+//-------------------------------------------------------------------------
+void vtkITKXFMWriter::Write()
+{
+  this->Modified();
+  this->Update();
+}
+
+//-------------------------------------------------------------------------
+void vtkITKXFMWriter::SetTransformCenter(double x, double y, double z)
+{
+  if (x != this->TransformCenter[0] ||
+      y != this->TransformCenter[1] ||
+      z != this->TransformCenter[2])
+    {
+    thi
