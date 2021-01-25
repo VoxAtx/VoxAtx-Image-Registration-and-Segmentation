@@ -250,4 +250,53 @@ int vtkITKXFMWriter::WriteFile()
   bool isMat = vtkITKXFMWriter::IsMatFile(this->FileName);
 
   // Open the file.
-  ofstr
+  ofstream outfile(this->FileName,
+                   (isMat ? ios::out | ios::trunc | ios::binary :
+                            ios::out | ios::trunc));
+
+  if (outfile.fail())
+    {
+    vtkErrorMacro("WriteFile: Can't create the file " << this->FileName);
+    return 0;
+    }
+
+  if (!isMat)
+    {
+    // Write the header
+    outfile << "#Insight Transform File V1.0\n";
+    }
+
+  // Push the transforms onto the stack in reverse order
+  std::stack<vtkAbstractTransform *> tstack;
+  int i = this->Transforms->GetNumberOfItems();
+  while (i > 0)
+    {
+    tstack.push(
+      ((vtkAbstractTransform *)this->Transforms->GetItemAsObject(--i)));
+    }
+  tstack.push(this->Transform);
+
+  // Write out all the transforms on the stack
+  int status = 1;
+  int count = 0;
+  while (status != 0 && !tstack.empty())
+    {
+    vtkAbstractTransform *transform = tstack.top();
+    tstack.pop();
+
+    if (transform->IsA("vtkGeneralTransform"))
+      {
+      // Decompose general transforms
+      vtkGeneralTransform *gtrans = (vtkGeneralTransform *)transform;
+      int n = gtrans->GetNumberOfConcatenatedTransforms();
+      while (n > 0)
+        {
+        tstack.push(gtrans->GetConcatenatedTransform(--n));
+        }
+      }
+    else
+      {
+      // Write all other kinds of transforms
+      if (!isMat)
+        {
+        outfile << "#Transform " << count <<
