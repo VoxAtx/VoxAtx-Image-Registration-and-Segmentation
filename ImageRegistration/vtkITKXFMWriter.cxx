@@ -353,4 +353,67 @@ void vtkITKXFMWriter::SetTransformCenter(double x, double y, double z)
       y != this->TransformCenter[1] ||
       z != this->TransformCenter[2])
     {
-    thi
+    this->TransformCenter[0] = x;
+    this->TransformCenter[1] = y;
+    this->TransformCenter[2] = z;
+    this->Modified();
+    }
+}
+
+//-------------------------------------------------------------------------
+int vtkITKXFMWriter::GetNumberOfTransforms()
+{
+  if (this->Transform == 0)
+    {
+    return 0;
+    }
+
+  return (1 + this->Transforms->GetNumberOfItems());
+}
+
+//-------------------------------------------------------------------------
+void vtkITKXFMWriter::SetTransform(vtkAbstractTransform *transform)
+{
+  if (transform == this->Transform)
+    {
+    return;
+    }
+
+  if (this->Transform != 0)
+    {
+    this->Transform->Delete();
+    }
+
+  if (transform != 0)
+    {
+    transform->Register(this);
+    }
+
+  this->Transform = transform;
+  this->Transforms->RemoveAllItems();
+  this->Modified();
+}
+
+//-------------------------------------------------------------------------
+void vtkITKXFMWriter::AddTransform(vtkAbstractTransform *transform)
+{
+  if (transform == 0)
+    {
+    return;
+    }
+
+  if (this->Transform == 0)
+    {
+    this->SetTransform(transform);
+    }
+  else
+    {
+    this->Transforms->AddItem(transform);
+    this->Modified();
+    }
+}
+
+//-------------------------------------------------------------------------
+bool vtkITKXFMWriter::IsMatFile(const char *fname)
+{
+  // If fi
