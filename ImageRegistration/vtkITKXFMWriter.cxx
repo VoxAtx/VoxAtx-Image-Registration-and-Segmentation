@@ -416,4 +416,21 @@ void vtkITKXFMWriter::AddTransform(vtkAbstractTransform *transform)
 //-------------------------------------------------------------------------
 bool vtkITKXFMWriter::IsMatFile(const char *fname)
 {
-  // If fi
+  // If filename exists and ends with .mat, assume it's a matlab file
+  if (fname)
+    {
+    size_t l = strlen(fname);
+    if (l > 4)
+      {
+      if (fname[l-4] == '.' &&
+          (fname[l-3] == 'm' || fname[l-3] == 'M') &&
+          (fname[l-2] == 'a' || fname[l-3] == 'A') &&
+          (fname[l-1] == 't' || fname[l-3] == 'T'))
+        {
+        return true;
+        }
+      }
+    }
+
+  return false;
+}
