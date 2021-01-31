@@ -6,4 +6,30 @@
   All rights reserved.
   See Copyright.txt or http://dgobbi.github.io/bsd3.txt for details.
 
-     This software is distributed WITHOUT ANY WARRANTY; 
+     This software is distributed WITHOUT ANY WARRANTY; without even
+     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+     PURPOSE.  See the above copyright notice for more information.
+
+=========================================================================*/
+// .NAME vtkImageCorrelationRatio - Correlation ratio similarity metric.
+// .SECTION Description
+// vtkImageCorrelationRatio computes the correlation ratio for one image
+// with respect to a second image.  Unlike many other image similarity
+// metrics, it is not symmetrical. It assumes that there is a functional
+// dependence of the first image on the second image, but does not assume
+// that the reverse is true.  It is an efficient and robust method for
+// multi-modal image registration.  For more information, please read
+// the reference.
+//
+// It is necessary to call SetInputRange(0, range) with the range of the
+// first image.  This is used to set the size of the array of partial sums
+// that is used to compute the metric.  If not set, a default range of
+// (0, 255) is used which is only suitable for 8-bit images.
+//
+// References:
+//
+//  [1] A. Roche, G. Malandain, X. Pennec and N. Ayache,
+//      The Correlation Ratio as a New Similarity Measure for Multimodal
+//      Image Registration, MICCAI '98, LNCS 1496:1115-1124, 1998.
+
+#ifnde
