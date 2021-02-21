@@ -32,4 +32,46 @@
 //      The Correlation Ratio as a New Similarity Measure for Multimodal
 //      Image Registration, MICCAI '98, LNCS 1496:1115-1124, 1998.
 
-#ifnde
+#ifndef vtkImageCorrelationRatio_h
+#define vtkImageCorrelationRatio_h
+
+#include "vtkImageSimilarityMetric.h"
+
+class vtkImageCorrelationRatioTLS;
+
+class VTK_EXPORT vtkImageCorrelationRatio : public vtkImageSimilarityMetric
+{
+public:
+  static vtkImageCorrelationRatio *New();
+  vtkTypeMacro(vtkImageCorrelationRatio, vtkImageSimilarityMetric);
+
+  void PrintSelf(ostream& os, vtkIndent indent);
+
+  // Description:
+  // Set the range of the data for the first input.
+  // This is a legacy method, use SetInputRange() instead.
+  void SetDataRange(const double range[2]) {
+    this->SetInputRange(0, range); }
+
+protected:
+  vtkImageCorrelationRatio();
+  ~vtkImageCorrelationRatio();
+
+  int RequestData(vtkInformation *request,
+                  vtkInformationVector **inputVector,
+                  vtkInformationVector *outputVector);
+
+  void PieceRequestData(vtkInformation *request,
+                        vtkInformationVector **inputVector,
+                        vtkInformationVector *outputVector,
+                        const int pieceExtent[6], vtkIdType pieceId);
+
+  void ReduceRequestData(vtkInformation *request,
+                         vtkInformationVector **inInfo,
+                         vtkInformationVector *outInfo);
+
+  int NumberOfBins;
+  double BinOrigin;
+  double BinSpacing;
+
+  vtkImageCorre
