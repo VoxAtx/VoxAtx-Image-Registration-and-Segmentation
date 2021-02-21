@@ -74,4 +74,11 @@ protected:
   double BinOrigin;
   double BinSpacing;
 
-  vtkImageCorre
+  vtkImageCorrelationRatioTLS *ThreadData;
+
+private:
+  vtkImageCorrelationRatio(const vtkImageCorrelationRatio&);  // Not implemented.
+  void operator=(const vtkImageCorrelationRatio&);  // Not implemented.
+};
+
+#endif
