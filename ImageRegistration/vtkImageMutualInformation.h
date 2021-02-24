@@ -59,4 +59,36 @@ public:
   // Set the type for the output.  The joint histogram will always be
   // computed using vtkIdType, but since vtkIdType is not directly
   // supported as an image data type, it will be converted to the requested
-  // type for use as the output of the filter.  The default type is f
+  // type for use as the output of the filter.  The default type is float.
+  vtkSetMacro(OutputScalarType, int);
+  vtkGetMacro(OutputScalarType, int);
+  void SetOutputScalarTypeToFloat() {
+    this->SetOutputScalarType(VTK_FLOAT); }
+  void SetOutputScalarTypeToDouble() {
+    this->SetOutputScalarType(VTK_DOUBLE); }
+  void SetOutputScalarTypeToInt() {
+    this->SetOutputScalarType(VTK_INT); }
+  void SetOutputScalarTypeToUnsignedInt() {
+    this->SetOutputScalarType(VTK_UNSIGNED_INT); }
+  void SetOutputScalarTypeToLong() {
+    this->SetOutputScalarType(VTK_LONG); }
+  void SetOutputScalarTypeToUnsignedLong() {
+    this->SetOutputScalarType(VTK_UNSIGNED_LONG); }
+  void SetOutputScalarTypeToShort() {
+    this->SetOutputScalarType(VTK_SHORT); }
+  void SetOutputScalarTypeToUnsignedShort() {
+    this->SetOutputScalarType(VTK_UNSIGNED_SHORT); }
+  void SetOutputScalarTypeToSignedChar() {
+    this->SetOutputScalarType(VTK_SIGNED_CHAR); }
+  void SetOutputScalarTypeToUnsignedChar() {
+    this->SetOutputScalarType(VTK_UNSIGNED_CHAR); }
+
+  // Description:
+  // Set the number of bins in the X and Y directions.  Default: 64x64.
+  vtkSetVector2Macro(NumberOfBins, int);
+  vtkGetVector2Macro(NumberOfBins, int);
+
+  // Description:
+  // Set the center position of the first bin.  The default is zero.
+  // This is a legacy method, instead of calling the SetBinOrigin() you
+  // should call SetNumberOfBins
