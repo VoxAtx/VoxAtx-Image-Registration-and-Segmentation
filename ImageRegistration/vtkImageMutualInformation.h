@@ -91,4 +91,35 @@ public:
   // Description:
   // Set the center position of the first bin.  The default is zero.
   // This is a legacy method, instead of calling the SetBinOrigin() you
-  // should call SetNumberOfBins
+  // should call SetNumberOfBins() and SetInputRange().  The BinOrigin
+  // will be computed automatically when the metric executes.
+  vtkSetVector2Macro(BinOrigin, double);
+  vtkGetVector2Macro(BinOrigin, double);
+
+  // Description:
+  // Set the joint histogram bin spacing.  The default is one.
+  // This is a legacy method, instead of calling the SetBinSpacing() you
+  // should call SetNumberOfBins() and SetInputRange().  The BinSpacing
+  // will be computed automatically when the metric executes.
+  vtkSetVector2Macro(BinSpacing, double);
+  vtkGetVector2Macro(BinSpacing, double);
+
+  // Description:
+  // Get the mutual information that was computed for the joint histogram.
+  // The result is only valid after the filter has executed.
+  vtkGetMacro(MutualInformation, double);
+
+  // Description:
+  // Get the normalized mutual information that was computed for the joint
+  // histogram.  The result is only valid after the filter has executed.
+  vtkGetMacro(NormalizedMutualInformation, double);
+
+  // The metrics (MutualInformation, NormalizedMutualInformation).
+  enum { MI, NMI };
+
+  // Description:
+  // Set the metric to use for the cost. The default is Mutual Information.
+  void SetMetricToMutualInformation() { this->SetMetric(MI); }
+  void SetMetricToNormalizedMutualInformation() { this->SetMetric(NMI); }
+  vtkSetMacro(Metric, int);
+  vtkGetMa
