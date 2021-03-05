@@ -122,4 +122,45 @@ public:
   void SetMetricToMutualInformation() { this->SetMetric(MI); }
   void SetMetricToNormalizedMutualInformation() { this->SetMetric(NMI); }
   vtkSetMacro(Metric, int);
-  vtkGetMa
+  vtkGetMacro(Metric, int);
+
+protected:
+  vtkImageMutualInformation();
+  ~vtkImageMutualInformation();
+
+  int RequestInformation(vtkInformation *request,
+                         vtkInformationVector **inInfo,
+                         vtkInformationVector *outInfo);
+
+  int RequestData(vtkInformation *request,
+                  vtkInformationVector **inputVector,
+                  vtkInformationVector *outputVector);
+
+  void PieceRequestData(vtkInformation *request,
+                        vtkInformationVector **inputVector,
+                        vtkInformationVector *outputVector,
+                        const int pieceExtent[6], vtkIdType pieceId);
+
+  void ReduceRequestData(vtkInformation *request,
+                         vtkInformationVector **inInfo,
+                         vtkInformationVector *outInfo);
+
+  int NumberOfBins[2];
+  double BinOrigin[2];
+  double BinSpacing[2];
+
+  int OutputScalarType;
+
+  int Metric;
+
+  double MutualInformation;
+  double NormalizedMutualInformation;
+
+  vtkImageMutualInformationTLS *ThreadData;
+
+private:
+  vtkImageMutualInformation(const vtkImageMutualInformation&);  // Not implemented.
+  void operator=(const vtkImageMutualInformation&);  // Not implemented.
+};
+
+#endif
