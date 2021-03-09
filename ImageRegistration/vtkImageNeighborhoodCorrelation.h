@@ -42,4 +42,29 @@ public:
   vtkGetVector3Macro(NeighborhoodRadius, int);
 
 protected:
-  vtkImageNeighb
+  vtkImageNeighborhoodCorrelation();
+  ~vtkImageNeighborhoodCorrelation();
+
+  int RequestData(vtkInformation *request,
+                  vtkInformationVector **inputVector,
+                  vtkInformationVector *outputVector);
+
+  void PieceRequestData(vtkInformation *request,
+                        vtkInformationVector **inputVector,
+                        vtkInformationVector *outputVector,
+                        const int pieceExtent[6], vtkIdType pieceId);
+
+  void ReduceRequestData(vtkInformation *request,
+                         vtkInformationVector **inInfo,
+                         vtkInformationVector *outInfo);
+
+  int NeighborhoodRadius[3];
+
+  vtkImageNeighborhoodCorrelationTLS *ThreadData;
+
+private:
+  vtkImageNeighborhoodCorrelation(const vtkImageNeighborhoodCorrelation&);  // Not implemented.
+  void operator=(const vtkImageNeighborhoodCorrelation&);  // Not implemented.
+};
+
+#endif
