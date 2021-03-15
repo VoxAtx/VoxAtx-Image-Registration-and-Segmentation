@@ -108,4 +108,38 @@ vtkImageRegistration::vtkImageRegistration()
 {
   this->OptimizerType = vtkImageRegistration::Powell;
   this->MetricType = vtkImageRegistration::MutualInformation;
-  this->Interpo
+  this->InterpolatorType = vtkImageRegistration::Linear;
+  this->TransformType = vtkImageRegistration::Rigid;
+  this->InitializerType = vtkImageRegistration::None;
+  this->TransformDimensionality = 3;
+
+  this->Transform = vtkTransform::New();
+  this->Metric = NULL;
+  this->Optimizer = NULL;
+  this->Interpolator = NULL;
+
+  this->RegistrationInfo = new vtkImageRegistrationInfo;
+  this->RegistrationInfo->Transform = NULL;
+  this->RegistrationInfo->Optimizer = NULL;
+  this->RegistrationInfo->Metric = NULL;
+  this->RegistrationInfo->InitialMatrix = NULL;
+  this->RegistrationInfo->MetricValues = NULL;
+  this->RegistrationInfo->CostValues = NULL;
+  this->RegistrationInfo->ParameterValues = NULL;
+  this->RegistrationInfo->TransformDimensionality = 0;
+  this->RegistrationInfo->TransformType = 0;
+  this->RegistrationInfo->OptimizerType = 0;
+  this->RegistrationInfo->MetricType = 0;
+  this->RegistrationInfo->NumberOfEvaluations = 0;
+
+  this->JointHistogramSize[0] = 64;
+  this->JointHistogramSize[1] = 64;
+  this->SourceImageRange[0] = 0.0;
+  this->SourceImageRange[1] = -1.0;
+  this->TargetImageRange[0] = 0.0;
+  this->TargetImageRange[1] = -1.0;
+
+  this->InitialTransformMatrix = vtkMatrix4x4::New();
+  this->ImageReslice = vtkImageReslice::New();
+  this->ImageBSpline = vtkImageBSplineCoefficients::New();
+  this->TargetIm
