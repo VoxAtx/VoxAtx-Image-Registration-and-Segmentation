@@ -58,4 +58,54 @@
 
 // A macro to assist VTK 5 backwards compatibility
 #if VTK_MAJOR_VERSION >= 6
-#define SET_I
+#define SET_INPUT_DATA SetInputData
+#define SET_STENCIL_DATA SetStencilData
+#else
+#define SET_INPUT_DATA SetInput
+#define SET_STENCIL_DATA SetStencil
+#endif
+
+// A helper class for the optimizer
+struct vtkImageRegistrationInfo
+{
+  vtkTransform *Transform;
+  vtkFunctionMinimizer *Optimizer;
+  vtkImageSimilarityMetric *Metric;
+  vtkMatrix4x4 *InitialMatrix;
+
+  vtkDoubleArray *MetricValues;
+  vtkDoubleArray *CostValues;
+  vtkDoubleArray *ParameterValues;
+
+  int TransformDimensionality;
+  int TransformType;
+  int OptimizerType;
+  int MetricType;
+
+  double Center[3];
+
+  int NumberOfEvaluations;
+};
+
+//----------------------------------------------------------------------------
+vtkImageRegistration* vtkImageRegistration::New()
+{
+  // First try to create the object from the vtkObjectFactory
+  vtkObject* ret =
+    vtkObjectFactory::CreateInstance("vtkImageRegistration");
+
+  if (ret)
+    {
+    return (vtkImageRegistration*)ret;
+    }
+
+  // If the factory was unable to create the object, then create it here.
+  return new vtkImageRegistration;
+}
+
+//----------------------------------------------------------------------------
+vtkImageRegistration::vtkImageRegistration()
+{
+  this->OptimizerType = vtkImageRegistration::Powell;
+  this->MetricType = vtkImageRegistration::MutualInformation;
+  this->Interpo
