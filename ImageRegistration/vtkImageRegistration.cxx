@@ -201,4 +201,41 @@ vtkImageRegistration::~vtkImageRegistration()
     delete this->RegistrationInfo;
     }
 
-  if (
+  if (this->InitialTransformMatrix)
+    {
+    this->InitialTransformMatrix->Delete();
+    }
+  if (this->ImageReslice)
+    {
+    this->ImageReslice->Delete();
+    }
+  if (this->SourceImageTypecast)
+    {
+    this->SourceImageTypecast->Delete();
+    }
+  if (this->TargetImageTypecast)
+    {
+    this->TargetImageTypecast->Delete();
+    }
+  if (this->ImageBSpline)
+    {
+    this->ImageBSpline->Delete();
+    }
+}
+
+//----------------------------------------------------------------------------
+void vtkImageRegistration::PrintSelf(ostream& os, vtkIndent indent)
+{
+  this->Superclass::PrintSelf(os,indent);
+
+  os << indent << "OptimizerType: " << this->OptimizerType << "\n";
+  os << indent << "MetricType: " << this->MetricType << "\n";
+  os << indent << "InterpolatorType: " << this->InterpolatorType << "\n";
+  os << indent << "TransformType: " << this->TransformType << "\n";
+  os << indent << "TransformDimensionality: "
+     << this->TransformDimensionality << "\n";
+  os << indent << "InitializerType: " << this->InitializerType << "\n";
+  os << indent << "CostTolerance: " << this->CostTolerance << "\n";
+  os << indent << "TransformTolerance: " << this->TransformTolerance << "\n";
+  os << indent << "MaximumNumberOfIterations: "
+     << this->MaximumNumberOfIterations <
