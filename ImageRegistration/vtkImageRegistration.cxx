@@ -142,4 +142,63 @@ vtkImageRegistration::vtkImageRegistration()
   this->InitialTransformMatrix = vtkMatrix4x4::New();
   this->ImageReslice = vtkImageReslice::New();
   this->ImageBSpline = vtkImageBSplineCoefficients::New();
-  this->TargetIm
+  this->TargetImageTypecast = vtkImageShiftScale::New();
+  this->SourceImageTypecast = vtkImageShiftScale::New();
+
+  this->MetricValue = 0.0;
+  this->CostValue = 0.0;
+
+  this->CollectValues = false;
+  this->MetricValues = vtkDoubleArray::New();
+  this->CostValues = vtkDoubleArray::New();
+  this->ParameterValues = vtkDoubleArray::New();
+
+  this->CostTolerance = 1e-4;
+  this->TransformTolerance = 1e-1;
+  this->MaximumNumberOfIterations = 500;
+  this->MaximumNumberOfEvaluations = 5000;
+
+  // we have the image inputs and the optional stencil input
+  this->SetNumberOfInputPorts(3);
+  this->SetNumberOfOutputPorts(0);
+}
+
+//----------------------------------------------------------------------------
+vtkImageRegistration::~vtkImageRegistration()
+{
+  // delete vtk objects
+  if (this->Optimizer)
+    {
+    this->Optimizer->Delete();
+    }
+  if (this->Metric)
+    {
+    this->Metric->Delete();
+    }
+  if (this->Interpolator)
+    {
+    this->Interpolator->Delete();
+    }
+  if (this->Transform)
+    {
+    this->Transform->Delete();
+    }
+  if (this->MetricValues)
+    {
+    this->MetricValues->Delete();
+    }
+  if (this->CostValues)
+    {
+    this->CostValues->Delete();
+    }
+  if (this->ParameterValues)
+    {
+    this->ParameterValues->Delete();
+    }
+
+  if (this->RegistrationInfo)
+    {
+    delete this->RegistrationInfo;
+    }
+
+  if (
