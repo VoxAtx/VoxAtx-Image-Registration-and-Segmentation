@@ -238,4 +238,36 @@ void vtkImageRegistration::PrintSelf(ostream& os, vtkIndent indent)
   os << indent << "CostTolerance: " << this->CostTolerance << "\n";
   os << indent << "TransformTolerance: " << this->TransformTolerance << "\n";
   os << indent << "MaximumNumberOfIterations: "
-     << this->MaximumNumberOfIterations <
+     << this->MaximumNumberOfIterations << "\n";
+  os << indent << "MaximumNumberOfEvaluations: "
+     << this->MaximumNumberOfEvaluations << "\n";
+  os << indent << "JointHistogramSize: " << this->JointHistogramSize[0] << " "
+     << this->JointHistogramSize[1] << "\n";
+  os << indent << "SourceImageRange: " << this->SourceImageRange[0] << " "
+     << this->SourceImageRange[1] << "\n";
+  os << indent << "TargetImageRange: " << this->TargetImageRange[0] << " "
+     << this->TargetImageRange[1] << "\n";
+  os << indent << "MetricValue: " << this->MetricValue << "\n";
+  os << indent << "CostValue: " << this->CostValue << "\n";
+  os << indent << "CollectValues: "
+     << (this->CollectValues ? "On\n" : "Off\n");
+  os << indent << "MetricValues: " << this->MetricValues << "\n";
+  os << indent << "CostValues: " << this->CostValues << "\n";
+  os << indent << "ParameterValues: " << this->ParameterValues << "\n";
+  os << indent << "NumberOfEvaluations: "
+     << this->RegistrationInfo->NumberOfEvaluations << "\n";
+}
+
+//----------------------------------------------------------------------------
+vtkLinearTransform *vtkImageRegistration::GetTransform()
+{
+  return this->Transform;
+}
+
+//----------------------------------------------------------------------------
+int vtkImageRegistration::GetNumberOfEvaluations()
+{
+  return this->RegistrationInfo->NumberOfEvaluations;
+}
+
+//---
