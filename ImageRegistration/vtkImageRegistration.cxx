@@ -270,4 +270,46 @@ int vtkImageRegistration::GetNumberOfEvaluations()
   return this->RegistrationInfo->NumberOfEvaluations;
 }
 
-//---
+//----------------------------------------------------------------------------
+void vtkImageRegistration::SetTargetImage(vtkImageData *input)
+{
+  // Ask the superclass to connect the input.
+#if VTK_MAJOR_VERSION >= 6
+  this->SetInputDataInternal(1, input);
+#else
+  this->SetNthInputConnection(1, 0, (input ? input->GetProducerPort() : 0));
+#endif
+}
+
+//----------------------------------------------------------------------------
+vtkImageData* vtkImageRegistration::GetTargetImage()
+{
+  if (this->GetNumberOfInputConnections(0) < 1)
+    {
+    return NULL;
+    }
+  return vtkImageData::SafeDownCast(this->GetExecutive()->GetInputData(1, 0));
+}
+
+//----------------------------------------------------------------------------
+void vtkImageRegistration::SetSourceImage(vtkImageData *input)
+{
+  // Ask the superclass to connect the input.
+#if VTK_MAJOR_VERSION >= 6
+  this->SetInputDataInternal(0, input);
+#else
+  this->SetNthInputConnection(0, 0, (input ? input->GetProducerPort() : 0));
+#endif
+}
+
+//----------------------------------------------------------------------------
+vtkImageData* vtkImageRegistration::GetSourceImage()
+{
+  if (this->GetNumberOfInputConnections(1) < 1)
+    {
+    return NULL;
+    }
+  return vtkImageData::SafeDownCast(this->GetExecutive()->GetInputData(0, 0));
+}
+
+//---------------------------------------------------------
