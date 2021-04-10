@@ -312,4 +312,45 @@ vtkImageData* vtkImageRegistration::GetSourceImage()
   return vtkImageData::SafeDownCast(this->GetExecutive()->GetInputData(0, 0));
 }
 
-//---------------------------------------------------------
+//----------------------------------------------------------------------------
+void vtkImageRegistration::SetSourceImageStencil(vtkImageStencilData *stencil)
+{
+  // if stencil is null, then set the input port to null
+#if VTK_MAJOR_VERSION >= 6
+  this->SetInputDataInternal(2, stencil);
+#else
+  this->SetNthInputConnection(2, 0,
+    (stencil ? stencil->GetProducerPort() : 0));
+#endif
+}
+
+//----------------------------------------------------------------------------
+vtkImageStencilData* vtkImageRegistration::GetSourceImageStencil()
+{
+  if (this->GetNumberOfInputConnections(2) < 1)
+    {
+    return NULL;
+    }
+  return vtkImageStencilData::SafeDownCast(
+    this->GetExecutive()->GetInputData(2, 0));
+}
+
+//--------------------------------------------------------------------------
+namespace {
+
+void vtkTransformRotation(
+  vtkTransform *transform, double rx, double ry, double rz)
+{
+  // angle is the norm of the parameters,
+  // axis is the unit vector from the parameters
+  double theta2 = rx*rx + ry*ry + rz*rz;
+  if (theta2 > 0)
+    {
+    // compute the quaternion wxyz from angle and vector,
+    // then use the quaternion to compute the matrix
+    double theta = sqrt(theta2);
+    double n = sin(0.5*theta);
+    double w = cos(0.5*theta);
+    double f = n/theta;
+    double x = f*rx;
+    double y = f*ry;
