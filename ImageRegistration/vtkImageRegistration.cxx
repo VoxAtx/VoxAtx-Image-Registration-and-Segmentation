@@ -470,4 +470,47 @@ void vtkSetTransformParameters(vtkImageRegistrationInfo *registrationInfo)
   transform->Identity();
   transform->PostMultiply();
   transform->Translate(-center[0], -center[1], -center[2]);
-  if (scale
+  if (scaledAtSource)
+    {
+    vtkTransformRotation(transform, -qx, -qy, -qz);
+    transform->Scale(sx, sy, sz);
+    vtkTransformRotation(transform, qx, qy, qz);
+    transform->Concatenate(initialMatrix);
+    vtkTransformRotation(transform, rx, ry, rz);
+    }
+  else
+    {
+    vtkTransformRotation(transform, rx, ry, rz);
+    transform->Concatenate(initialMatrix);
+    vtkTransformRotation(transform, -qx, -qy, -qz);
+    transform->Scale(sx, sy, sz);
+    vtkTransformRotation(transform, qx, qy, qz);
+    }
+  transform->Translate(center[0], center[1], center[2]);
+  transform->Translate(tx,ty,tz);
+}
+
+//--------------------------------------------------------------------------
+void vtkEvaluateFunction(void * arg)
+{
+  vtkImageRegistrationInfo *registrationInfo =
+    static_cast<vtkImageRegistrationInfo*>(arg);
+
+  vtkFunctionMinimizer *optimizer = registrationInfo->Optimizer;
+  vtkImageSimilarityMetric *metric = registrationInfo->Metric;
+
+  vtkSetTransformParameters(registrationInfo);
+
+  registrationInfo->Metric->Update();
+
+  optimizer->SetFunctionValue(metric->GetCost());
+
+  if (registrationInfo->MetricValues)
+    {
+    registrationInfo->MetricValues->InsertNextValue(metric->GetValue());
+    }
+  if (registrationInfo->CostValues)
+    {
+    registrationInfo->CostValues->InsertNextValue(metric->GetCost());
+    }
+  if (r
