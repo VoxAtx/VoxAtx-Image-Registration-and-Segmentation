@@ -408,4 +408,66 @@ void vtkSetTransformParameters(vtkImageRegistrationInfo *registrationInfo)
   double tz = 0.0;
   if (transformDim > 2)
     {
-    tz = optimizer->GetParamet
+    tz = optimizer->GetParameterValue(pcount++);
+    }
+
+  double rx = 0.0;
+  double ry = 0.0;
+  double rz = 0.0;
+
+  if (transformType > vtkImageRegistration::Translation)
+    {
+    if (transformDim > 2)
+      {
+      rx = optimizer->GetParameterValue(pcount++);
+      ry = optimizer->GetParameterValue(pcount++);
+      }
+    rz = optimizer->GetParameterValue(pcount++);
+    }
+
+  double sx = 1.0;
+  double sy = 1.0;
+  double sz = 1.0;
+
+  if (transformType > vtkImageRegistration::Rigid)
+    {
+    sx = exp(optimizer->GetParameterValue(pcount++));
+    sy = sx;
+    if (transformDim > 2)
+      {
+      sz = sx;
+      }
+    }
+
+  if (transformType > vtkImageRegistration::Similarity)
+    {
+    if (transformDim > 2)
+      {
+      sx = sz*exp(optimizer->GetParameterValue(pcount++));
+      }
+    sy = sz*exp(optimizer->GetParameterValue(pcount++));
+    }
+
+  bool scaledAtSource =
+    (transformType == vtkImageRegistration::ScaleSourceAxes);
+
+  double qx = 0.0;
+  double qy = 0.0;
+  double qz = 0.0;
+
+  if (transformType >= vtkImageRegistration::Affine)
+    {
+    if (transformDim > 2)
+      {
+      qx = optimizer->GetParameterValue(pcount++);
+      qy = optimizer->GetParameterValue(pcount++);
+      }
+    qz = optimizer->GetParameterValue(pcount++);
+    }
+
+  double *center = registrationInfo->Center;
+
+  transform->Identity();
+  transform->PostMultiply();
+  transform->Translate(-center[0], -center[1], -center[2]);
+  if (scale
