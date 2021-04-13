@@ -354,3 +354,58 @@ void vtkTransformRotation(
     double f = n/theta;
     double x = f*rx;
     double y = f*ry;
+    double z = f*rz;
+
+    double ww = w*w;
+    double wx = w*x;
+    double wy = w*y;
+    double wz = w*z;
+
+    double xx = x*x;
+    double yy = y*y;
+    double zz = z*z;
+
+    double xy = x*y;
+    double xz = x*z;
+    double yz = y*z;
+
+    double s = ww - xx - yy - zz;
+
+    double matrix[16];
+    matrix[0] = xx*2 + s;
+    matrix[1] = (xy - wz)*2;
+    matrix[2] = (xz + wy)*2;
+    matrix[3] = 0.0;
+    matrix[4] = (xy + wz)*2;
+    matrix[5] = yy*2 + s;
+    matrix[6] = (yz - wx)*2;
+    matrix[7] = 0.0;
+    matrix[8] = (xz - wy)*2;
+    matrix[9] = (yz + wx)*2;
+    matrix[10] = zz*2 + s;
+    matrix[11] = 0.0;
+    matrix[12] = 0.0;
+    matrix[13] = 0.0;
+    matrix[14] = 0.0;
+    matrix[15] = 1.0;
+
+    transform->Concatenate(matrix);
+    }
+}
+
+void vtkSetTransformParameters(vtkImageRegistrationInfo *registrationInfo)
+{
+  vtkFunctionMinimizer* optimizer = registrationInfo->Optimizer;
+  vtkTransform* transform = registrationInfo->Transform;
+  vtkMatrix4x4 *initialMatrix = registrationInfo->InitialMatrix;
+  int transformType = registrationInfo->TransformType;
+  int transformDim = registrationInfo->TransformDimensionality;
+
+  int pcount = 0;
+
+  double tx = optimizer->GetParameterValue(pcount++);
+  double ty = optimizer->GetParameterValue(pcount++);
+  double tz = 0.0;
+  if (transformDim > 2)
+    {
+    tz = optimizer->GetParamet
