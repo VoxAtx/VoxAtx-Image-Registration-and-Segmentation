@@ -513,4 +513,54 @@ void vtkEvaluateFunction(void * arg)
     {
     registrationInfo->CostValues->InsertNextValue(metric->GetCost());
     }
-  if (r
+  if (registrationInfo->ParameterValues)
+    {
+    double parameters[12];
+    int n = optimizer->GetNumberOfParameters();
+    for (int i = 0; i < n; i++)
+      {
+      parameters[i] = optimizer->GetParameterValue(i);
+      }
+    registrationInfo->ParameterValues->InsertNextTuple(parameters);
+    }
+
+  registrationInfo->NumberOfEvaluations++;
+}
+
+} // end anonymous namespace
+
+//--------------------------------------------------------------------------
+void vtkImageRegistration::ComputeImageRange(
+  vtkImageData *data, vtkImageStencilData *stencil, double range[2])
+{
+  vtkImageHistogramStatistics *hist =
+    vtkImageHistogramStatistics::New();
+  hist->SET_STENCIL_DATA(stencil);
+  hist->SET_INPUT_DATA(data);
+  hist->SetActiveComponent(0);
+  hist->Update();
+
+  range[0] = hist->GetMinimum();
+  range[1] = hist->GetMaximum();
+
+  if (range[0] >= range[1])
+    {
+    range[1] = range[0] + 1.0;
+    }
+
+  hist->SET_INPUT_DATA(NULL);
+  hist->Delete();
+}
+
+//--------------------------------------------------------------------------
+void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
+{
+  // update our inputs
+  this->Update();
+
+  int transformDim = this->TransformDimensionality;
+  if (transformDim < 2) { transformDim = 2; }
+  if (transformDim > 3) { transformDim = 3; }
+
+  vtkImageData *targetImage = this->GetTargetImage();
+  vtkImageData *sourceImag
