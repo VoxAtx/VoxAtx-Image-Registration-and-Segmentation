@@ -653,4 +653,37 @@ void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
   targetImageRange[1] = this->TargetImageRange[1];
 
   if (this->MetricType == vtkImageRegistration::MutualInformation ||
-      this->MetricType == vtkImageRegistration::NormalizedMutu
+      this->MetricType == vtkImageRegistration::NormalizedMutualInformation)
+    {
+    if (sourceImageRange[0] >= sourceImageRange[1])
+      {
+      this->ComputeImageRange(sourceImage, this->GetSourceImageStencil(),
+        sourceImageRange);
+      }
+    if (targetImageRange[0] >= targetImageRange[1])
+      {
+      this->ComputeImageRange(targetImage, NULL,
+        targetImageRange);
+      }
+
+    if (this->InterpolatorType == vtkImageRegistration::Nearest &&
+        this->JointHistogramSize[0] <= 256 &&
+        this->JointHistogramSize[1] <= 256)
+      {
+      // If nearest-neighbor interpolation is used, then the image instensity
+      // can be quantized during initialization, instead of being done at each
+      // iteration of the registration.
+
+      double sourceScale = ((this->JointHistogramSize[1] - 1)/
+        (sourceImageRange[1] - sourceImageRange[0]));
+      // The "0.5/sourceScale" causes the vtkImageShiftScale filter to
+      // round the value, instead of truncating it.
+      double sourceShift = (-sourceImageRange[0] + 0.5/sourceScale);
+
+      vtkImageShiftScale *sourceQuantizer = this->SourceImageTypecast;
+      sourceQuantizer->SET_INPUT_DATA(sourceImage);
+      sourceQuantizer->SetOutputScalarTypeToUnsignedChar();
+      sourceQuantizer->ClampOverflowOn();
+      sourceQuantizer->SetShift(sourceShift);
+      sourceQuantizer->SetScale(sourceScale);
+      so
