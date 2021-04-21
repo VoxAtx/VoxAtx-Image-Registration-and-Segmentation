@@ -686,4 +686,39 @@ void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
       sourceQuantizer->ClampOverflowOn();
       sourceQuantizer->SetShift(sourceShift);
       sourceQuantizer->SetScale(sourceScale);
-      so
+      sourceQuantizer->Update();
+      sourceImage = sourceQuantizer->GetOutput();
+
+      double targetScale = ((this->JointHistogramSize[0] - 1)/
+        (targetImageRange[1] - targetImageRange[0]));
+      double targetShift = (-targetImageRange[0] + 0.5/targetScale);
+
+      vtkImageShiftScale *targetQuantizer = this->TargetImageTypecast;
+      targetQuantizer->SET_INPUT_DATA(targetImage);
+      targetQuantizer->SetOutputScalarTypeToUnsignedChar();
+      targetQuantizer->ClampOverflowOn();
+      targetQuantizer->SetShift(targetShift);
+      targetQuantizer->SetScale(targetScale);
+      targetQuantizer->Update();
+      targetImage = targetQuantizer->GetOutput();
+
+      // the rescaled image range is now the histogram range
+      targetImageRange[0] = 0;
+      targetImageRange[1] = this->JointHistogramSize[0] - 1;
+      sourceImageRange[0] = 0;
+      sourceImageRange[1] = this->JointHistogramSize[1] - 1;
+      }
+    }
+
+  // make sure source range is computed for CorrelationRatio
+  if (this->MetricType == vtkImageRegistration::CorrelationRatio)
+    {
+    if (sourceImageRange[0] >= sourceImageRange[1])
+      {
+      this->ComputeImageRange(sourceImage, this->GetSourceImageStencil(),
+        sourceImageRange);
+      }
+    }
+
+  // apply b-spline prefilter if b-spline interpolator is used
+  if (this->Interpolato
