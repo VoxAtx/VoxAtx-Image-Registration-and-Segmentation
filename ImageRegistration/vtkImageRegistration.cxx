@@ -609,4 +609,48 @@ void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
     initialMatrix->Element[1][3] = 0.0;
     initialMatrix->Element[2][3] = 0.0;
 
-    // adjust t
+    // adjust the translation for the transform centering
+    double scenter[4];
+    scenter[0] = center[0];
+    scenter[1] = center[1];
+    scenter[2] = center[2];
+    scenter[3] = 1.0;
+
+    initialMatrix->MultiplyPoint(scenter, scenter);
+
+    tx -= center[0] - scenter[0];
+    ty -= center[1] - scenter[1];
+    tz -= center[2] - scenter[2];
+    }
+
+  if (this->InitializerType == vtkImageRegistration::Centered)
+    {
+    // set an initial translation from one image center to the other image center
+    double tbounds[6];
+    double tcenter[3];
+    targetImage->GetBounds(tbounds);
+    tcenter[0] = 0.5*(tbounds[0] + tbounds[1]);
+    tcenter[1] = 0.5*(tbounds[2] + tbounds[3]);
+    tcenter[2] = 0.5*(tbounds[4] + tbounds[5]);
+
+    tx = tcenter[0] - center[0];
+    ty = tcenter[1] - center[1];
+    tz = tcenter[2] - center[2];
+    }
+
+  if (transformDim <= 2)
+    {
+    center[2] = 0.0;
+    tz = 0.0;
+    }
+
+  // do the setup for mutual information
+  double sourceImageRange[2];
+  double targetImageRange[2];
+  sourceImageRange[0] = this->SourceImageRange[0];
+  sourceImageRange[1] = this->SourceImageRange[1];
+  targetImageRange[0] = this->TargetImageRange[0];
+  targetImageRange[1] = this->TargetImageRange[1];
+
+  if (this->MetricType == vtkImageRegistration::MutualInformation ||
+      this->MetricType == vtkImageRegistration::NormalizedMutu
