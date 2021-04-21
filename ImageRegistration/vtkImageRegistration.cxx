@@ -563,4 +563,50 @@ void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
   if (transformDim > 3) { transformDim = 3; }
 
   vtkImageData *targetImage = this->GetTargetImage();
-  vtkImageData *sourceImag
+  vtkImageData *sourceImage = this->GetSourceImage();
+
+  if (targetImage == NULL || sourceImage == NULL)
+    {
+    vtkErrorMacro("Initialize: Input images are not set");
+    return;
+    }
+
+  // get the source image center
+  double bounds[6];
+  double center[3];
+  double size[3];
+  sourceImage->GetBounds(bounds);
+  center[0] = 0.5*(bounds[0] + bounds[1]);
+  center[1] = 0.5*(bounds[2] + bounds[3]);
+  center[2] = 0.5*(bounds[4] + bounds[5]);
+  size[0] = (bounds[1] - bounds[0]);
+  size[1] = (bounds[3] - bounds[2]);
+  size[2] = (bounds[5] - bounds[4]);
+
+  vtkTransform *transform = this->Transform;
+  vtkMatrix4x4 *initialMatrix = this->InitialTransformMatrix;
+
+  // create an initial transform
+  initialMatrix->Identity();
+  transform->Identity();
+
+  // the initial translation
+  double tx = 0.0;
+  double ty = 0.0;
+  double tz = 0.0;
+
+  // initialize from the supplied matrix
+  if (matrix)
+    {
+    // move the translation into tx, ty, tz variables
+    tx = matrix->Element[0][3];
+    ty = matrix->Element[1][3];
+    tz = matrix->Element[2][3];
+
+    // move rotation/scale/shear into the InitialTransformMatrix
+    initialMatrix->DeepCopy(matrix);
+    initialMatrix->Element[0][3] = 0.0;
+    initialMatrix->Element[1][3] = 0.0;
+    initialMatrix->Element[2][3] = 0.0;
+
+    // adjust t
