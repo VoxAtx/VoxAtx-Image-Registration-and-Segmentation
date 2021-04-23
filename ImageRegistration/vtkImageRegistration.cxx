@@ -721,4 +721,40 @@ void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
     }
 
   // apply b-spline prefilter if b-spline interpolator is used
-  if (this->Interpolato
+  if (this->InterpolatorType == vtkImageRegistration::BSpline)
+    {
+    int scalarType = VTK_FLOAT;
+    if (targetImage->GetScalarType() == VTK_DOUBLE ||
+        sourceImage->GetScalarType() == VTK_DOUBLE)
+      {
+      scalarType = VTK_DOUBLE;
+      }
+
+    if (sourceImage->GetScalarType() != scalarType)
+      {
+      vtkImageShiftScale *sourceCast = this->SourceImageTypecast;
+      sourceCast->SET_INPUT_DATA(sourceImage);
+      sourceCast->SetOutputScalarType(scalarType);
+      sourceCast->ClampOverflowOff();
+      sourceCast->SetShift(0.0);
+      sourceCast->SetScale(1.0);
+      sourceCast->Update();
+      sourceImage = sourceCast->GetOutput();
+      }
+
+    vtkImageBSplineCoefficients *bspline = this->ImageBSpline;
+    bspline->SET_INPUT_DATA(targetImage);
+    bspline->SetOutputScalarType(scalarType);
+    bspline->Update();
+    targetImage = bspline->GetOutput();
+    }
+
+  // coerce types if NeighborhoodCorrelation
+  if (sourceImage->GetScalarType() != targetImage->GetScalarType() &&
+      (this->MetricType == vtkImageRegistration::SquaredDifference ||
+       this->MetricType == vtkImageRegistration::NeighborhoodCorrelation))
+    {
+    // coerce the types to make them compatible
+    int sourceType = sourceImage->GetScalarType();
+    int targetType = targetImage->GetScalarType();
+    int sourc
