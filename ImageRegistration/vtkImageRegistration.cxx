@@ -757,4 +757,48 @@ void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
     // coerce the types to make them compatible
     int sourceType = sourceImage->GetScalarType();
     int targetType = targetImage->GetScalarType();
-    int sourc
+    int sourceSize = sourceImage->GetScalarSize();
+    int targetSize = targetImage->GetScalarSize();
+    int coercedType = VTK_DOUBLE;
+
+    if (sourceSize < targetSize)
+      {
+      coercedType = targetType;
+      }
+    else if (sourceSize > targetSize)
+      {
+      coercedType = sourceType;
+      }
+    else if (sourceSize < 8 && targetSize < 8)
+      {
+      coercedType = VTK_FLOAT;
+      }
+
+    if (sourceType != coercedType)
+      {
+      vtkImageShiftScale *sourceCast = this->SourceImageTypecast;
+      sourceCast->SET_INPUT_DATA(sourceImage);
+      sourceCast->SetOutputScalarType(coercedType);
+      sourceCast->ClampOverflowOff();
+      sourceCast->SetShift(0.0);
+      sourceCast->SetScale(1.0);
+      sourceCast->Update();
+      sourceImage = sourceCast->GetOutput();
+      }
+
+    if (targetType != coercedType)
+      {
+      vtkImageShiftScale *targetCast = this->TargetImageTypecast;
+      targetCast->SET_INPUT_DATA(targetImage);
+      targetCast->SetOutputScalarType(coercedType);
+      targetCast->ClampOverflowOff();
+      targetCast->SetShift(0.0);
+      targetCast->SetScale(1.0);
+      targetCast->Update();
+      targetImage = targetCast->GetOutput();
+      }
+    }
+
+  vtkImageReslice *reslice = this->ImageReslice;
+  reslice->SetInformationInput(sourceImage);
+  reslice->SET_INPUT_DAT
