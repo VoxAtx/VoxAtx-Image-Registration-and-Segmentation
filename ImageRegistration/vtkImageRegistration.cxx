@@ -801,4 +801,46 @@ void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
 
   vtkImageReslice *reslice = this->ImageReslice;
   reslice->SetInformationInput(sourceImage);
-  reslice->SET_INPUT_DAT
+  reslice->SET_INPUT_DATA(targetImage);
+  reslice->SET_STENCIL_DATA(this->GetSourceImageStencil());
+  reslice->SetResliceTransform(this->Transform);
+  reslice->GenerateStencilOutputOn();
+  reslice->SetInterpolator(0);
+  switch (this->InterpolatorType)
+    {
+    case vtkImageRegistration::Nearest:
+      reslice->SetInterpolationModeToNearestNeighbor();
+      break;
+    case vtkImageRegistration::Linear:
+      reslice->SetInterpolationModeToLinear();
+      break;
+    case vtkImageRegistration::Cubic:
+      reslice->SetInterpolationModeToCubic();
+      break;
+    case vtkImageRegistration::BSpline:
+      {
+      vtkImageBSplineInterpolator *interp = vtkImageBSplineInterpolator::New();
+      reslice->SetInterpolator(interp);
+      interp->Delete();
+      }
+      break;
+    case vtkImageRegistration::Sinc:
+      {
+      vtkImageSincInterpolator *interp = vtkImageSincInterpolator::New();
+      interp->SetWindowFunctionToBlackman();
+      reslice->SetInterpolator(interp);
+      interp->Delete();
+      }
+      break;
+    case vtkImageRegistration::ASinc:
+      {
+      vtkImageSincInterpolator *interp = vtkImageSincInterpolator::New();
+      interp->SetWindowFunctionToBlackman();
+      interp->AntialiasingOn();
+      reslice->SetInterpolator(interp);
+      interp->Delete();
+      }
+      break;
+    case vtkImageRegistration::Label:
+      {
+      vtkLabelInterpo
