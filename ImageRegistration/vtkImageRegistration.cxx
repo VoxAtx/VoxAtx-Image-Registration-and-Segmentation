@@ -843,4 +843,59 @@ void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
       break;
     case vtkImageRegistration::Label:
       {
-      vtkLabelInterpo
+      vtkLabelInterpolator *interp = vtkLabelInterpolator::New();
+      reslice->SetInterpolator(interp);
+      interp->Delete();
+      }
+      break;
+    }
+
+  if (this->Metric)
+    {
+    this->Metric->RemoveAllInputs();
+    this->Metric->Delete();
+    this->Metric = 0;
+    }
+
+  switch (this->MetricType)
+    {
+    case vtkImageRegistration::SquaredDifference:
+      {
+      this->Metric = vtkImageSquaredDifference::New();
+      }
+      break;
+
+    case vtkImageRegistration::CrossCorrelation:
+    case vtkImageRegistration::NormalizedCrossCorrelation:
+      {
+      vtkImageCrossCorrelation *metric = vtkImageCrossCorrelation::New();
+      this->Metric = metric;
+
+      if (this->MetricType ==
+          vtkImageRegistration::NormalizedCrossCorrelation)
+        {
+        metric->SetMetricToNormalizedCrossCorrelation();
+        }
+      else
+        {
+        metric->SetMetricToCrossCorrelation();
+        }
+      }
+      break;
+
+    case vtkImageRegistration::NeighborhoodCorrelation:
+      {
+      this->Metric = vtkImageNeighborhoodCorrelation::New();
+      }
+      break;
+
+    case vtkImageRegistration::CorrelationRatio:
+      {
+      this->Metric = vtkImageCorrelationRatio::New();
+      }
+      break;
+
+    case vtkImageRegistration::MutualInformation:
+    case vtkImageRegistration::NormalizedMutualInformation:
+      {
+      vtkImageMutualInformati
