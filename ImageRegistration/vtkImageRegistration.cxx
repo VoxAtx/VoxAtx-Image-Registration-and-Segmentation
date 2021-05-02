@@ -898,4 +898,55 @@ void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
     case vtkImageRegistration::MutualInformation:
     case vtkImageRegistration::NormalizedMutualInformation:
       {
-      vtkImageMutualInformati
+      vtkImageMutualInformation *metric = vtkImageMutualInformation::New();
+      this->Metric = metric;
+
+      metric->SetNumberOfBins(this->JointHistogramSize);
+
+      if (this->MetricType ==
+          vtkImageRegistration::NormalizedMutualInformation)
+        {
+        metric->SetMetricToNormalizedMutualInformation();
+        }
+      else
+        {
+        metric->SetMetricToMutualInformation();
+        }
+      }
+      break;
+    }
+
+  if (this->Optimizer)
+    {
+    this->Optimizer->Delete();
+    this->Optimizer = 0;
+    }
+
+  switch (this->OptimizerType)
+    {
+    case vtkImageRegistration::Powell:
+      {
+      this->Optimizer = vtkPowellMinimizer::New();
+      }
+      break;
+
+    case vtkImageRegistration::Amoeba:
+      {
+      vtkNelderMeadMinimizer *amoeba = vtkNelderMeadMinimizer::New();
+      // use golden ratio
+      amoeba->SetExpansionRatio(1.618);
+      amoeba->SetContractionRatio(0.618);
+      this->Optimizer = amoeba;
+      }
+      break;
+    }
+
+  this->Metric->SET_INPUT_DATA(sourceImage);
+  this->Metric->SetInputConnection(1, reslice->GetOutputPort());
+  this->Metric->SetInputConnection(2, reslice->GetStencilOutputPort());
+  this->Metric->SetInputRange(0, sourceImageRange);
+  this->Metric->SetInputRange(1, targetImageRange);
+
+  this->Optimizer->SetTolerance(this->CostTolerance);
+  this->Optimizer->SetParameterTolerance(this->TransformTolerance);
+  this->Opt
