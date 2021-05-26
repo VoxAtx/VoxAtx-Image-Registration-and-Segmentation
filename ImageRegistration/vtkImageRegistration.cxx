@@ -949,4 +949,40 @@ void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
 
   this->Optimizer->SetTolerance(this->CostTolerance);
   this->Optimizer->SetParameterTolerance(this->TransformTolerance);
-  this->Opt
+  this->Optimizer->SetMaxIterations(this->MaximumNumberOfIterations);
+
+  this->RegistrationInfo->Transform = this->Transform;
+  this->RegistrationInfo->Optimizer = this->Optimizer;
+  this->RegistrationInfo->Metric = this->Metric;
+  this->RegistrationInfo->InitialMatrix = this->InitialTransformMatrix;
+
+  if (this->CollectValues)
+    {
+    this->RegistrationInfo->MetricValues = this->MetricValues;
+    this->RegistrationInfo->CostValues = this->CostValues;
+    this->RegistrationInfo->ParameterValues = this->ParameterValues;
+    }
+  else
+    {
+    this->RegistrationInfo->MetricValues = NULL;
+    this->RegistrationInfo->CostValues = NULL;
+    this->RegistrationInfo->ParameterValues = NULL;
+    }
+
+  this->RegistrationInfo->TransformDimensionality =
+    this->TransformDimensionality;
+  this->RegistrationInfo->TransformType = this->TransformType;
+  this->RegistrationInfo->OptimizerType = this->OptimizerType;
+  this->RegistrationInfo->MetricType = this->MetricType;
+
+  this->RegistrationInfo->NumberOfEvaluations = 0;
+
+  this->RegistrationInfo->Center[0] = center[0];
+  this->RegistrationInfo->Center[1] = center[1];
+  this->RegistrationInfo->Center[2] = center[2];
+
+  vtkFunctionMinimizer *optimizer = this->Optimizer;
+  optimizer->SetFunction(&vtkEvaluateFunction,
+                         (void*)(this->RegistrationInfo));
+
+  //
