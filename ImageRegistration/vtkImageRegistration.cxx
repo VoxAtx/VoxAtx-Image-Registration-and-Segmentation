@@ -1033,3 +1033,44 @@ void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
     }
 
   // rotation parameters
+  if (this->TransformType > vtkImageRegistration::Translation)
+    {
+    if (transformDim > 2)
+      {
+      optimizer->SetParameterValue(pcount, 0);
+      optimizer->SetParameterScale(pcount++, rscale);
+      optimizer->SetParameterValue(pcount, 0);
+      optimizer->SetParameterScale(pcount++, rscale);
+      }
+    optimizer->SetParameterValue(pcount, 0);
+    optimizer->SetParameterScale(pcount++, rscale);
+    }
+
+  if (this->TransformType > vtkImageRegistration::Rigid)
+    {
+    // single scale parameter
+    optimizer->SetParameterValue(pcount, 0);
+    optimizer->SetParameterScale(pcount++, sscale);
+    }
+
+  if (this->TransformType > vtkImageRegistration::Similarity)
+    {
+    // extra scale parameters, weighed at 25%
+    optimizer->SetParameterValue(pcount, 0);
+    optimizer->SetParameterScale(pcount++, sscale*0.25);
+    if (transformDim > 2)
+      {
+      optimizer->SetParameterValue(pcount, 0);
+      optimizer->SetParameterScale(pcount++, sscale*0.25);
+      }
+    }
+
+  if (this->TransformType == vtkImageRegistration::Affine)
+    {
+    // extra rotation parameters, scaled at 25%
+    if (transformDim > 2)
+      {
+      optimizer->SetParameterValue(pcount, 0);
+      optimizer->SetParameterScale(pcount++, rscale*0.25);
+      optimizer->SetParameterValue(pcount, 0);
+      optimizer->SetParameterScale(pcount++, r
