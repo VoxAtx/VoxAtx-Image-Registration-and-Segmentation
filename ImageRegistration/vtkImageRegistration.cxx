@@ -985,4 +985,51 @@ void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
   optimizer->SetFunction(&vtkEvaluateFunction,
                          (void*)(this->RegistrationInfo));
 
-  //
+  // compute minimum spacing of target image
+  double spacing[3];
+  targetImage->GetSpacing(spacing);
+  double minspacing = spacing[0];
+  minspacing = ((minspacing < spacing[1]) ? minspacing : spacing[1]);
+  minspacing = ((minspacing < spacing[2]) ? minspacing : spacing[2]);
+
+  // compute a radius of gyration from the two larger dimensions
+  double r2 = 0.0;
+  double mindim = VTK_DOUBLE_MAX;
+  for (int ii = 0; ii < transformDim; ii++)
+    {
+    mindim = (size[ii] > mindim ? mindim : size[ii]);
+    r2 += size[ii]*size[ii];
+    }
+  r2 -= mindim*mindim;
+  double r = sqrt(r2/12);
+
+  // compute parameter scales
+  double tscale = this->TransformTolerance*10;
+  tscale = ((tscale >= minspacing) ? tscale : minspacing);
+  double rscale = tscale/r;
+  double sscale = tscale/r;
+  if (rscale > 0.5)
+    {
+    rscale = 0.5;
+    }
+  if (sscale > 0.1)
+    {
+    sscale = 0.1;
+    }
+
+  optimizer->Initialize();
+
+  int pcount = 0;
+
+  // translation parameters
+  optimizer->SetParameterValue(pcount, tx);
+  optimizer->SetParameterScale(pcount++, tscale);
+  optimizer->SetParameterValue(pcount, ty);
+  optimizer->SetParameterScale(pcount++, tscale);
+  if (transformDim > 2)
+    {
+    optimizer->SetParameterValue(pcount, tz);
+    optimizer->SetParameterScale(pcount++, tscale);
+    }
+
+  // rotation parameters
