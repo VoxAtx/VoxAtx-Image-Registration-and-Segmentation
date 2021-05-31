@@ -1123,4 +1123,59 @@ int vtkImageRegistration::ExecuteRegistration()
       this->MetricValue = optimizer->GetFunctionValue();
 
       if (this->RegistrationInfo->NumberOfEvaluations >=
-          this->MaximumNumberO
+          this->MaximumNumberOfEvaluations)
+        {
+        converged = 0;
+        break;
+        }
+      }
+
+    if (converged && !this->AbortExecute)
+      {
+      this->UpdateProgress(1.0);
+      }
+    }
+
+  this->ExecuteTime.Modified();
+  this->InvokeEvent(vtkCommand::EndEvent,NULL);
+
+  return converged;
+}
+
+//--------------------------------------------------------------------------
+int vtkImageRegistration::Iterate()
+{
+  vtkFunctionMinimizer *optimizer = this->Optimizer;
+
+  if (optimizer)
+    {
+    int result = optimizer->Iterate();
+    if (optimizer->GetIterations() >= this->MaximumNumberOfIterations ||
+        this->RegistrationInfo->NumberOfEvaluations >=
+          this->MaximumNumberOfEvaluations)
+      {
+      result = 0;
+      }
+    vtkSetTransformParameters(this->RegistrationInfo);
+    this->MetricValue = optimizer->GetFunctionValue();
+    return result;
+    }
+
+  return 0;
+}
+
+//--------------------------------------------------------------------------
+int vtkImageRegistration::UpdateRegistration()
+{
+  this->Update();
+  return this->ExecuteRegistration();
+}
+
+//----------------------------------------------------------------------------
+int vtkImageRegistration::FillInputPortInformation(int port,
+                                                   vtkInformation* info)
+{
+  if (port == 2)
+    {
+    info->Set(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkImageStencilData");
+    // the st
