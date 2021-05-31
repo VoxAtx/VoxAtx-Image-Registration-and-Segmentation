@@ -1073,4 +1073,54 @@ void vtkImageRegistration::Initialize(vtkMatrix4x4 *matrix)
       optimizer->SetParameterValue(pcount, 0);
       optimizer->SetParameterScale(pcount++, rscale*0.25);
       optimizer->SetParameterValue(pcount, 0);
-      optimizer->SetParameterScale(pcount++, r
+      optimizer->SetParameterScale(pcount++, rscale*0.25);
+      }
+    optimizer->SetParameterValue(pcount, 0);
+    optimizer->SetParameterScale(pcount++, rscale*0.25);
+    }
+
+  // build the initial transform from the parameters
+  vtkSetTransformParameters(this->RegistrationInfo);
+
+  this->MetricValues->Initialize();
+  this->CostValues->Initialize();
+  this->ParameterValues->Initialize();
+  this->ParameterValues->SetNumberOfComponents(
+    optimizer->GetNumberOfParameters());
+
+  this->Modified();
+}
+
+//--------------------------------------------------------------------------
+int vtkImageRegistration::ExecuteRegistration()
+{
+  // reset Abort flag
+  this->AbortExecute = 0;
+  this->Progress = 0.0;
+
+  this->InvokeEvent(vtkCommand::StartEvent,NULL);
+
+  int converged = 0;
+
+  vtkFunctionMinimizer *optimizer = this->Optimizer;
+
+  if (optimizer)
+    {
+    int n = this->MaximumNumberOfIterations;
+    if (n <= 0)
+      {
+      n = VTK_INT_MAX;
+      }
+    for (int i = 0; i < n && !converged; i++)
+      {
+      this->UpdateProgress(i*1.0/n);
+      if (this->AbortExecute)
+        {
+        break;
+        }
+      converged = !optimizer->Iterate();
+      vtkSetTransformParameters(this->RegistrationInfo);
+      this->MetricValue = optimizer->GetFunctionValue();
+
+      if (this->RegistrationInfo->NumberOfEvaluations >=
+          this->MaximumNumberO
