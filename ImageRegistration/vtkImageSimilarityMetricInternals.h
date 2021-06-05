@@ -106,3 +106,104 @@ public:
       {
       size_t n = a->GetNumberOfThreads();
       this->MT = new T[n];
+      this->NumberOfThreads = n;
+      }
+    }
+
+  T& Local(size_t threadId)
+    {
+    if (this->MT == 0)
+      {
+      return this->SMP.Local();
+      }
+    else
+      {
+      return this->MT[threadId];
+      }
+    }
+
+  iterator begin()
+    {
+    if (this->MT == 0)
+      {
+      return this->SMP.begin();
+      }
+    else
+      {
+      return this->MT;
+      }
+    }
+
+  iterator end()
+    {
+    if (this->MT == 0)
+      {
+      return this->SMP.end();
+      }
+    else
+      {
+      return this->MT + this->NumberOfThreads;
+      }
+    }
+
+private:
+  vtkImageSimilarityMetricTLS(const vtkImageSimilarityMetricTLS&);
+  void operator=(const vtkImageSimilarityMetricTLS&);
+
+  vtkSMPThreadLocal<T> SMP;
+  T *MT;
+  size_t NumberOfThreads;
+};
+
+#else
+
+//----------------------------------------------------------------------------
+// A simple thread-local storage class template for versions of VTK prior
+// to the introduction of vtkSMPTools.  It simply provides an array of the
+// specified object type, one object per thread.
+template<typename T>
+class vtkImageSimilarityMetricTLS
+{
+public:
+  typedef T* iterator;
+
+  vtkImageSimilarityMetricTLS() : MT(0), NumberOfThreads(0) {}
+
+  ~vtkImageSimilarityMetricTLS()
+    {
+    delete [] this->MT;
+    }
+
+  void Initialize(vtkImageSimilarityMetric *a)
+    {
+    size_t n = a->GetNumberOfThreads();
+    this->MT = new T[n];
+    this->NumberOfThreads = n;
+    }
+
+  T& Local(size_t threadId)
+    {
+    return this->MT[threadId];
+    }
+
+  iterator begin()
+    {
+    return this->MT;
+    }
+
+  iterator end()
+    {
+    return this->MT + this->NumberOfThreads;
+    }
+
+private:
+  vtkImageSimilarityMetricTLS(const vtkImageSimilarityMetricTLS&);
+  void operator=(const vtkImageSimilarityMetricTLS&);
+
+  T *MT;
+  size_t NumberOfThreads;
+};
+
+#endif
+
+#endif /* vtkImageSimilarityMetricInternals_h */
