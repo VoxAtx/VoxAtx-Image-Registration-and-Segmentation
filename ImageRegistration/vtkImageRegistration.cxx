@@ -1178,4 +1178,46 @@ int vtkImageRegistration::FillInputPortInformation(int port,
   if (port == 2)
     {
     info->Set(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkImageStencilData");
-    // the st
+    // the stencil input is optional
+    info->Set(vtkAlgorithm::INPUT_IS_OPTIONAL(), 1);
+    }
+  else
+    {
+    info->Set(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkImageData");
+    info->Set(vtkAlgorithm::INPUT_IS_REPEATABLE(), 1);
+    }
+
+  return 1;
+}
+
+//----------------------------------------------------------------------------
+int vtkImageRegistration::FillOutputPortInformation(
+  int vtkNotUsed(port), vtkInformation* vtkNotUsed(info))
+{
+  return 1;
+}
+
+//----------------------------------------------------------------------------
+int vtkImageRegistration::RequestInformation(
+  vtkInformation *vtkNotUsed(request),
+  vtkInformationVector **vtkNotUsed(inputVector),
+  vtkInformationVector *vtkNotUsed(outputVector))
+{
+  return 1;
+}
+
+//----------------------------------------------------------------------------
+int vtkImageRegistration::RequestUpdateExtent(
+  vtkInformation *vtkNotUsed(request),
+  vtkInformationVector **inputVector,
+  vtkInformationVector *vtkNotUsed(outputVector))
+{
+  int inExt[6];
+
+  // source image
+  vtkInformation *inInfo = inputVector[0]->GetInformationObject(0);
+  inInfo->Get(vtkStreamingDemandDrivenPipeline::WHOLE_EXTENT(), inExt);
+  inInfo->Set(vtkStreamingDemandDrivenPipeline::UPDATE_EXTENT(), inExt, 6);
+
+  // target image
+  inInfo = inputVector[1]->GetInformationObject(0)
