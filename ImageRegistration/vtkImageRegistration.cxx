@@ -1220,4 +1220,43 @@ int vtkImageRegistration::RequestUpdateExtent(
   inInfo->Set(vtkStreamingDemandDrivenPipeline::UPDATE_EXTENT(), inExt, 6);
 
   // target image
-  inInfo = inputVector[1]->GetInformationObject(0)
+  inInfo = inputVector[1]->GetInformationObject(0);
+  inInfo->Get(vtkStreamingDemandDrivenPipeline::WHOLE_EXTENT(), inExt);
+  inInfo->Set(vtkStreamingDemandDrivenPipeline::UPDATE_EXTENT(), inExt, 6);
+
+  // stencil for target image
+  if (this->GetNumberOfInputConnections(2) > 0)
+    {
+    vtkInformation *inInfo2 = inputVector[2]->GetInformationObject(0);
+    inInfo2->Set(vtkStreamingDemandDrivenPipeline::UPDATE_EXTENT(), inExt, 6);
+    }
+
+  return 1;
+}
+//----------------------------------------------------------------------------
+int vtkImageRegistration::RequestData(
+  vtkInformation *vtkNotUsed(request),
+  vtkInformationVector **vtkNotUsed(inputVector),
+  vtkInformationVector *vtkNotUsed(outputVector))
+{
+  return 1;
+}
+
+//----------------------------------------------------------------------------
+int vtkImageRegistration::ProcessRequest(vtkInformation* request,
+                                         vtkInformationVector** inputVector,
+                                         vtkInformationVector* outputVector)
+{
+  // generate the data oject
+  if (request->Has(vtkDemandDrivenPipeline::REQUEST_DATA_OBJECT()))
+    {
+    return 1;
+    }
+  // generate the data
+  if (request->Has(vtkDemandDrivenPipeline::REQUEST_DATA()))
+    {
+    return this->RequestData(request, inputVector, outputVector);
+    }
+
+  // execute information
+  if (request->Has(vtkDemandDrivenPipeline::REQUEST_I
