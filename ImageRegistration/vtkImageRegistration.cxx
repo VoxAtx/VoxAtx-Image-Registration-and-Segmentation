@@ -1259,4 +1259,16 @@ int vtkImageRegistration::ProcessRequest(vtkInformation* request,
     }
 
   // execute information
-  if (request->Has(vtkDemandDrivenPipeline::REQUEST_I
+  if (request->Has(vtkDemandDrivenPipeline::REQUEST_INFORMATION()))
+    {
+    return this->RequestInformation(request, inputVector, outputVector);
+    }
+
+  // propagate update extent
+  if (request->Has(vtkStreamingDemandDrivenPipeline::REQUEST_UPDATE_EXTENT()))
+    {
+    return this->RequestUpdateExtent(request, inputVector, outputVector);
+    }
+
+  return this->Superclass::ProcessRequest(request, inputVector, outputVector);
+}
