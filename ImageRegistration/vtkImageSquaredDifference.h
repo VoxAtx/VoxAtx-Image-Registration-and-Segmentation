@@ -27,4 +27,33 @@ class vtkImageSquaredDifferenceTLS;
 class VTK_EXPORT vtkImageSquaredDifference : public vtkImageSimilarityMetric
 {
 public:
-  static vtkImageSquaredDifference *
+  static vtkImageSquaredDifference *New();
+  vtkTypeMacro(vtkImageSquaredDifference, vtkImageSimilarityMetric);
+
+  void PrintSelf(ostream& os, vtkIndent indent);
+
+protected:
+  vtkImageSquaredDifference();
+  ~vtkImageSquaredDifference();
+
+  int RequestData(vtkInformation *request,
+                  vtkInformationVector **inputVector,
+                  vtkInformationVector *outputVector);
+
+  void PieceRequestData(vtkInformation *request,
+                        vtkInformationVector **inputVector,
+                        vtkInformationVector *outputVector,
+                        const int pieceExtent[6], vtkIdType pieceId);
+
+  void ReduceRequestData(vtkInformation *request,
+                         vtkInformationVector **inInfo,
+                         vtkInformationVector *outInfo);
+
+  vtkImageSquaredDifferenceTLS *ThreadData;
+
+private:
+  vtkImageSquaredDifference(const vtkImageSquaredDifference&);  // Not implemented.
+  void operator=(const vtkImageSquaredDifference&);  // Not implemented.
+};
+
+#endif
