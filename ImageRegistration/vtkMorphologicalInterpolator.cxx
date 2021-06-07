@@ -329,3 +329,398 @@ void vtkImageMorphInterpolate<F, T>::General(
         const F *tmpfX = fX;
         const vtkIdType *tmpfactX = factX;
         int l = xm;
+        if (operation == VTK_IMIOPERATION_DILATE)
+          { // dilation uses the max() operator
+          do
+            {
+            if (fzy + tmpfX[0] < 0)
+              {
+              F tmpval = tmpPtr[tmpfactX[0]];
+              val = (val > tmpval ? val : tmpval); // max(val,tmpval)
+              }
+            tmpfX++;
+            tmpfactX++;
+            }
+          while (--l);
+          }
+        else // (operation == VTK_IMIOPERATION_ERODE)
+          { // erosion uses the min() operator
+          do
+            {
+            if (fzy + tmpfX[0] < 0)
+              {
+              F tmpval = tmpPtr[tmpfactX[0]];
+              val = (val < tmpval ? val : tmpval); // mix(val,tmpval)
+              }
+            tmpfX++;
+            tmpfactX++;
+            }
+          while (--l);
+          }
+        }
+      while (++j <= j2);
+      }
+    while (++k <= k2);
+
+    *outPtr++ = val;
+    inPtr++;
+    }
+  while (--numscalars);
+}
+
+//----------------------------------------------------------------------------
+// Get the interpolation function for the specified data types
+template<class F>
+void vtkMorphologicalInterpolatorGetInterpolationFunc(
+  void (**interpolate)(vtkInterpolationInfo *, const F [3], F *),
+  int dataType, int vtkNotUsed(interpolationMode))
+{
+  switch (dataType)
+    {
+    vtkTemplateAliasMacro(
+      *interpolate =
+        &(vtkImageMorphInterpolate<F, VTK_TT>::General)
+      );
+    default:
+      *interpolate = 0;
+    }
+}
+
+//----------------------------------------------------------------------------
+// Interpolation for precomputed weights
+
+template <class F, class T>
+struct vtkImageMorphRowInterpolate
+{
+  static void General(
+    vtkInterpolationWeights *weights, int idX, int idY, int idZ,
+    F *outPtr, int n);
+};
+
+//--------------------------------------------------------------------------
+// helper function for high-order interpolation
+template<class F, class T>
+void vtkImageMorphRowInterpolate<F, T>::General(
+  vtkInterpolationWeights *weights, int idX, int idY, int idZ,
+  F *outPtr, int n)
+{
+  int stepX = weights->KernelSize[0];
+  int stepY = weights->KernelSize[1];
+  int stepZ = weights->KernelSize[2];
+  idX *= stepX;
+  idY *= stepY;
+  idZ *= stepZ;
+  int rx = (stepX >> 1);
+  int ry = (stepY >> 1);
+  int rz = (stepZ >> 1);
+  const F *fX = static_cast<F *>(weights->Weights[0]) + idX;
+  const F *fY = static_cast<F *>(weights->Weights[1]) + idY;
+  const F *fZ = static_cast<F *>(weights->Weights[2]) + idZ;
+  const vtkIdType *factX = weights->Positions[0] + idX;
+  const vtkIdType *factY = weights->Positions[1] + idY;
+  const vtkIdType *factZ = weights->Positions[2] + idZ;
+  const T *inPtr = static_cast<const T *>(weights->Pointer);
+  int operation = weights->InterpolationMode;
+
+  int numscalars = weights->NumberOfComponents;
+  for (int i = n; i > 0; --i)
+    {
+    const T *inPtr0 = inPtr;
+    int c = numscalars;
+    do // loop over components
+      {
+      F val = inPtr[factZ[rz] + factY[ry] + factX[rx]];
+      int k = 0;
+      do // loop over z
+        {
+        F ifz = fZ[k] - (1.0 + VTK_INTERPOLATE_FLOOR_TOL);
+        vtkIdType factz = factZ[k];
+        int j = 0;
+        do // loop over y
+          {
+          F ify = fY[j];
+          F fzy = ifz + ify;
+          vtkIdType factzy = factz + factY[j];
+          // loop over x
+          const T *tmpPtr = inPtr0 + factzy;
+          const F *tmpfX = fX;
+          const vtkIdType *tmpfactX = factX;
+          int l = stepX;
+          if (operation == VTK_IMIOPERATION_DILATE)
+            { // dilation uses the max() operator
+            do
+              {
+              if (fzy + tmpfX[0] < 0)
+                {
+                F tmpval = tmpPtr[tmpfactX[0]];
+                val = (val > tmpval ? val : tmpval); // max(val,tmpval)
+                }
+              tmpfX++;
+              tmpfactX++;
+              }
+            while (--l);
+            }
+          else // (operation == VTK_IMIOPERATION_ERODE)
+            { // erosion uses the min() operator
+            do
+              {
+              if (fzy + tmpfX[0] < 0)
+                {
+                F tmpval = tmpPtr[tmpfactX[0]];
+                val = (val < tmpval ? val : tmpval); // mix(val,tmpval)
+                }
+              tmpfX++;
+              tmpfactX++;
+              }
+            while (--l);
+            }
+          }
+        while (++j < stepY);
+        }
+      while (++k < stepZ);
+
+      *outPtr++ = val;
+      inPtr0++;
+      }
+    while (--c);
+
+    factX += stepX;
+    fX += stepX;
+    }
+}
+
+//----------------------------------------------------------------------------
+// get row interpolation function for different interpolation modes
+// and different scalar types
+template<class F>
+void vtkMorphologicalInterpolatorGetRowInterpolationFunc(
+  void (**summation)(vtkInterpolationWeights *weights, int idX, int idY,
+                     int idZ, F *outPtr, int n),
+  int scalarType, int vtkNotUsed(interpolationMode))
+{
+  switch (scalarType)
+    {
+    vtkTemplateAliasMacro(
+      *summation = &(vtkImageMorphRowInterpolate<F,VTK_TT>::General)
+      );
+    default:
+      *summation = 0;
+    }
+}
+
+//----------------------------------------------------------------------------
+template<class F>
+void vtkMorphologicalInterpolatorPrecomputeWeights(
+  const F newmat[16], const int outExt[6], int clipExt[6],
+  const F bounds[6], vtkInterpolationWeights *weights)
+{
+  double *radius = static_cast<double *>(weights->ExtraInfo);
+  double *invRadius = &radius[3];
+  weights->WeightType = vtkTypeTraits<F>::VTKTypeID();
+
+  // set up input positions table for interpolation
+  bool validClip = true;
+  for (int j = 0; j < 3; j++)
+    {
+    // set k to the row for which the element in column j is nonzero,
+    // and set matrow to the elements of that row
+    int k = 0;
+    const F *matrow = newmat;
+    while (k < 3 && matrow[j] == 0)
+      {
+      k++;
+      matrow += 4;
+      }
+
+    // get the extents
+    clipExt[2*j] = outExt[2*j];
+    clipExt[2*j + 1] = outExt[2*j + 1];
+    int minExt = weights->Extent[2*k];
+    int maxExt = weights->Extent[2*k + 1];
+    F minBounds = bounds[2*k];
+    F maxBounds = bounds[2*k + 1];
+
+    int r = static_cast<int>(radius[j]);
+    int step = r*2 + 1;
+    if (minExt == maxExt)
+      {
+      step = 1;
+      }
+
+    // allocate space for the weights
+    vtkIdType size = step*(outExt[2*j+1] - outExt[2*j] + 1);
+    vtkIdType *positions = new vtkIdType[size];
+    positions -= step*outExt[2*j];
+    F *constants = new F[size];
+    constants -= step*outExt[2*j];
+
+    weights->KernelSize[j] = step;
+    weights->Positions[j] = positions;
+    weights->Weights[j] = constants;
+    weights->WeightExtent[2*j] = outExt[2*j];
+    weights->WeightExtent[2*j+1] = outExt[2*j+1];
+
+    int region = 0;
+    for (int i = outExt[2*j]; i <= outExt[2*j+1]; i++)
+      {
+      F point = matrow[3] + i*matrow[j];
+
+      F f;
+      int idx = vtkInterpolationMath::Floor(point + 0.5, f);
+      f -= 0.5;
+      if (step > 1)
+        {
+        idx -= r;
+        }
+
+      int inId[VTK_IMI_KERNEL_SIZE_MAX];
+
+      int l = 0;
+      switch (weights->BorderMode)
+        {
+        case VTK_IMAGE_BORDER_REPEAT:
+          do
+            {
+            inId[l] = vtkInterpolationMath::Wrap(idx++, minExt, maxExt);
+            }
+          while (++l < step);
+          break;
+
+        case VTK_IMAGE_BORDER_MIRROR:
+          do
+            {
+            inId[l] = vtkInterpolationMath::Mirror(idx++, minExt, maxExt);
+            }
+          while (++l < step);
+          break;
+
+        default:
+           do
+            {
+            inId[l] = vtkInterpolationMath::Clamp(idx++, minExt, maxExt);
+            }
+          while (++l < step);
+          break;
+        }
+
+      // compute the weights and offsets
+      vtkIdType inInc = weights->Increments[k];
+      if (step == 1)
+        {
+        positions[step*i] = inId[0]*inInc;
+        constants[step*i] = 0;
+        }
+      else
+        {
+        int ll = 0;
+        F x = -f - r;
+        do
+          {
+          F d = fabs(x) - 0.5;
+          d = (d < 0 ? 0 : d);
+          d *= invRadius[j];
+          constants[step*i + ll] = d*d;
+          positions[step*i + ll] = inId[ll]*inInc;
+          x++;
+          }
+        while (++ll < step);
+        }
+
+      if (point >= minBounds && point <= maxBounds)
+        {
+        if (region == 0)
+          { // entering the input extent
+          region = 1;
+          clipExt[2*j] = i;
+          }
+        }
+      else
+        {
+        if (region == 1)
+          { // leaving the input extent
+          region = 2;
+          clipExt[2*j+1] = i - 1;
+          }
+        }
+      }
+
+    if (region == 0 || clipExt[2*j] > clipExt[2*j+1])
+      { // never entered input extent!
+      validClip = false;
+      }
+    }
+
+  if (!validClip)
+    {
+    // output extent doesn't itersect input extent
+    for (int j = 0; j < 3; j++)
+      {
+      clipExt[2*j] = outExt[2*j];
+      clipExt[2*j + 1] = outExt[2*j] - 1;
+      }
+    }
+}
+
+//----------------------------------------------------------------------------
+} // ends anonymous namespace
+
+//----------------------------------------------------------------------------
+void vtkMorphologicalInterpolator::GetInterpolationFunc(
+  void (**func)(vtkInterpolationInfo *, const double [3], double *))
+{
+  vtkMorphologicalInterpolatorGetInterpolationFunc(
+    func, this->InterpolationInfo->ScalarType, this->Operation);
+}
+
+//----------------------------------------------------------------------------
+void vtkMorphologicalInterpolator::GetInterpolationFunc(
+  void (**func)(vtkInterpolationInfo *, const float [3], float *))
+{
+  vtkMorphologicalInterpolatorGetInterpolationFunc(
+    func, this->InterpolationInfo->ScalarType, this->Operation);
+}
+
+//----------------------------------------------------------------------------
+void vtkMorphologicalInterpolator::GetRowInterpolationFunc(
+  void (**func)(vtkInterpolationWeights *, int, int, int, double *, int))
+{
+  vtkMorphologicalInterpolatorGetRowInterpolationFunc(
+    func, this->InterpolationInfo->ScalarType, this->Operation);
+}
+
+//----------------------------------------------------------------------------
+void vtkMorphologicalInterpolator::GetRowInterpolationFunc(
+  void (**func)(vtkInterpolationWeights *, int, int, int, float *, int))
+{
+  vtkMorphologicalInterpolatorGetRowInterpolationFunc(
+    func, this->InterpolationInfo->ScalarType, this->Operation);
+}
+
+//----------------------------------------------------------------------------
+void vtkMorphologicalInterpolator::PrecomputeWeightsForExtent(
+  const double matrix[16], const int extent[6], int newExtent[6],
+  vtkInterpolationWeights *&weights)
+{
+  weights = new vtkInterpolationWeights(*this->InterpolationInfo);
+
+  vtkMorphologicalInterpolatorPrecomputeWeights(
+    matrix, extent, newExtent, this->StructuredBoundsDouble, weights);
+}
+
+//----------------------------------------------------------------------------
+void vtkMorphologicalInterpolator::PrecomputeWeightsForExtent(
+  const float matrix[16], const int extent[6], int newExtent[6],
+  vtkInterpolationWeights *&weights)
+{
+  weights = new vtkInterpolationWeights(*this->InterpolationInfo);
+
+  vtkMorphologicalInterpolatorPrecomputeWeights(
+    matrix, extent, newExtent, this->StructuredBoundsFloat, weights);
+}
+
+//----------------------------------------------------------------------------
+void vtkMorphologicalInterpolator::FreePrecomputedWeights(
+  vtkInterpolationWeights *&weights)
+{
+  this->Superclass::FreePrecomputedWeights(weights);
+}
