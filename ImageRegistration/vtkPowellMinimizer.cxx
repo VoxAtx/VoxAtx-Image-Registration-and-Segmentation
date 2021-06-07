@@ -293,3 +293,171 @@ double vtkPowellMinimizer::PowellBracket(
       for (int i = 0; i < n; i++)
         {
         point[i] = p0[i] + w*vec[i];
+        }
+      this->EvaluateFunction();
+      fw = this->FunctionValue;
+      }
+    xa = xb;
+    xb = xc;
+    xc = w;
+    fa = fb;
+    fb = fc;
+    fc = fw;
+    }
+
+  bracket[0] = xa;
+  bracket[1] = xb;
+  bracket[2] = xc;
+
+  if (fa <= fb)
+    {
+    *failed = true;
+    xb = xa;
+    fb = fa;
+    }
+  else if (fc <= fb)
+    {
+    *failed = true;
+    xb = xc;
+    fb = fc;
+    }
+  else
+    {
+    *failed = false;
+    }
+
+  for (int i = 0; i < n; i++)
+    {
+    point[i] = p0[i] + xb*vec[i];
+    }
+  return fb;
+}
+
+//----------------------------------------------------------------------------
+void vtkPowellMinimizer::Start()
+{
+  int n = this->NumberOfParameters;
+  double *pw = this->ParameterScales;
+  delete [] this->PowellVectors;
+  delete [] this->PowellWorkspace;
+
+  // allocate memory for the current point and for
+  // the conjugate directions
+  double **vecs = new double *[n];
+  double *work = new double[n*(n+2)];
+  for (int k = 0; k < n; k++)
+    {
+    double *v = work + n*(k + 2);
+    vecs[k] = v;
+    for (int i = 0; i < n; i++) { v[i] = 0.0; }
+    v[k] = pw[k];
+    }
+
+  this->PowellWorkspace = work;
+  this->PowellVectors = vecs;
+  this->EvaluateFunction();
+}
+
+//----------------------------------------------------------------------------
+int vtkPowellMinimizer::Step()
+{
+  double ftol = this->Tolerance;
+  double ptol = this->ParameterTolerance;
+  double y = this->FunctionValue;
+  double **vecs = this->PowellVectors;
+  int n = this->NumberOfParameters;
+  double *p = this->ParameterValues;
+  double *vs = this->ParameterScales;
+  double *p0 = this->PowellWorkspace;
+  double *p00 = p0 + n;
+
+  // save the current point
+  for (int i = 0; i < n; i++) { p00[i] = p[i]; }
+  double y00 = y;
+
+  // go through all of the directions,
+  // find the one that causes the greatest decrease
+  double dymax = 0.0;
+  int dymaxi = 0;
+  for (int j = 0; j < n; j++)
+    {
+    for (int i = 0; i < n; i++) { p0[i] = p[i]; }
+    double *v = vecs[j];
+    double y0 = y;
+    // compute length of vector
+    double l = 0.0;
+    for (int i = 0; i < n; i++)
+      {
+      double w = v[i]/vs[i];
+      l += w*w;
+      }
+    l = sqrt(l);
+    double gtol = ptol/l;
+    double bracket[3];
+    bool failed = false;
+    y = this->PowellBracket(p0, y0, v, p, n, bracket, &failed);
+    if (!failed)
+      {
+      y = this->PowellBrent(p0, y, v, p, n, bracket, gtol);
+      }
+    double dy = y0 - y;
+    if (dy > dymax)
+      {
+      dymax = dy;
+      dymaxi = j;
+      }
+    }
+
+  // compute the max distance for tolerance check
+  double maxw = 0.0;
+  for (int i = 0; i < n; i++)
+    {
+    double w = fabs(p00[i] - p[i])/vs[i];
+    maxw = (maxw > w ? maxw : w);
+    }
+
+  if (2*fabs(y00 - y) <= ftol*(fabs(y00) + fabs(y)) &&
+      maxw < ptol)
+    {
+    return 0;
+    }
+
+  // extrapolate the new point
+  for (int i = 0; i < n; i++)
+    {
+    double ptmp = p[i];
+    p[i] = 2*p[i] - p0[i];
+    p0[i] = ptmp;
+    }
+
+  this->EvaluateFunction();
+  double y0 = this->FunctionValue;
+
+  // if extrapolated point is an improvement
+  if (y0 < y00)
+    {
+    // see Numerical Recipes rationale for this in the section titled
+    // "Discarding the Direction of Largest Decrease".
+    double sq1 = y00 - y - dymax;
+    double sq2 = y00 - y0;
+    if (2*(y00 - 2*y + y0)*sq1*sq1 < sq2*sq2*dymax)
+      {
+      // compute the new direction
+      double *vecp = vecs[dymaxi];
+      for (int i = 0; i < n; i++)
+        {
+        vecp[i] = p0[i] - p00[i];
+        }
+
+      // move the new direction to the beginning
+      vecs[dymaxi] = vecs[0];
+      vecs[0] = vecp;
+      }
+    }
+
+  // restore p
+  for (int i = 0; i < n; i++) { p[i] = p0[i]; }
+  this->FunctionValue = y;
+
+  return 1;
+}
