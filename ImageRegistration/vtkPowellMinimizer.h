@@ -28,4 +28,39 @@ class VTK_EXPORT vtkPowellMinimizer : public vtkFunctionMinimizer
 public:
   static vtkPowellMinimizer *New();
   vtkTypeMacro(vtkPowellMinimizer,vtkFunctionMinimizer);
-  void PrintSelf
+  void PrintSelf(ostream& os, vtkIndent indent);
+
+protected:
+  vtkPowellMinimizer();
+  ~vtkPowellMinimizer();
+
+  // Description:
+  // Use Brent's method to search for a minimum.
+  double PowellBrent(
+    const double *p0, double y0, const double *v, double *p, int n,
+    const double bracket[3], double gtol);
+
+  // Description:
+  // Bracket a minimum, given a starting point.  Return the function
+  // value at the center point of the bracket.
+  double PowellBracket(
+    const double *p0, double y0, const double *v, double *p, int n,
+    double bracket[3], bool *failed);
+
+  // Description:
+  // Initialize the workspace required for the method.
+  void Start();
+
+  // Description:
+  // Run one iteration of Powell's method.
+  int Step();
+
+  double *PowellWorkspace;
+  double **PowellVectors;
+
+private:
+  vtkPowellMinimizer(const vtkPowellMinimizer&);  // Not implemented.
+  void operator=(const vtkPowellMinimizer&);  // Not implemented.
+};
+
+#endif
