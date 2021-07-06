@@ -146,3 +146,30 @@ protected:
   int ReplaceIn;
   int ReplaceOut;
   int ReplaceIsland;
+
+  vtkIdType LargestIsland;
+  vtkIdType SmallestIsland;
+  int IslandsSortedBySize;
+
+  int SliceRangeX[2];
+  int SliceRangeY[2];
+  int SliceRangeZ[2];
+
+  int ActiveComponent;
+
+  vtkImageData *ImageMask;
+
+  void ComputeInputUpdateExtent(int inExt[6], int outExt[6]);
+
+  virtual int FillInputPortInformation(int port, vtkInformation *info);
+  virtual int RequestUpdateExtent(vtkInformation *, vtkInformationVector **,
+                                  vtkInformationVector *);
+  virtual int RequestData(vtkInformation *, vtkInformationVector **,
+                          vtkInformationVector *);
+
+private:
+  vtkImageIslandRemoval(const vtkImageIslandRemoval&);  // Not implemented.
+  void operator=(const vtkImageIslandRemoval&);  // Not implemented.
+};
+
+#endif
