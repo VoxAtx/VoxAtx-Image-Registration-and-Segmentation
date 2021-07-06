@@ -52,3 +52,38 @@ class VTK_EXPORT vtkImageExtractPoints :
   public vtkPolyDataAlgorithm
 {
 public:
+  static vtkImageExtractPoints *New();
+  vtkTypeMacro(vtkImageExtractPoints,vtkPolyDataAlgorithm);
+  void PrintSelf(ostream& os, vtkIndent indent);
+
+  // Description:
+  // Only extract the points that lie within the stencil.
+  void SetStencilConnection(vtkAlgorithmOutput *port);
+  vtkAlgorithmOutput *GetStencilConnection();
+  void SetStencilData(vtkImageStencilData *stencil);
+
+  // Description:
+  // Set the desired precision for the output points.
+  // See vtkAlgorithm::DesiredOutputPrecision for the available choices.
+  // The default is double precision.
+  vtkSetMacro(OutputPointsPrecision, int);
+  vtkGetMacro(OutputPointsPrecision, int);
+
+protected:
+  vtkImageExtractPoints();
+  ~vtkImageExtractPoints();
+
+  virtual int RequestInformation(vtkInformation *request,
+                                 vtkInformationVector **inInfo,
+                                 vtkInformationVector *outInfo);
+
+  virtual int RequestUpdateExtent(vtkInformation *request,
+                                 vtkInformationVector **inInfo,
+                                 vtkInformationVector *outInfo);
+
+  virtual int RequestData(vtkInformation *request,
+                          vtkInformationVector **inInfo,
+                          vtkInformationVector *outInfo);
+
+  virtual int FillInputPortInformation(int port, vtkInformation *info);
+  virtual in
