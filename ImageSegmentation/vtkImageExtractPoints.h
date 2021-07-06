@@ -86,4 +86,13 @@ protected:
                           vtkInformationVector *outInfo);
 
   virtual int FillInputPortInformation(int port, vtkInformation *info);
-  virtual in
+  virtual int FillOutputPortInformation(int port, vtkInformation *info);
+
+  int OutputPointsPrecision;
+
+private:
+  vtkImageExtractPoints(const vtkImageExtractPoints&);  // Not implemented.
+  void operator=(const vtkImageExtractPoints&);  // Not implemented.
+};
+
+#endif
