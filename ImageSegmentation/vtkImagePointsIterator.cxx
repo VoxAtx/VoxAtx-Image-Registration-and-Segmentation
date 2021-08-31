@@ -41,4 +41,14 @@ vtkImagePointsIterator::vtkImagePointsIterator(
   this->UpdatePosition();
 }
 
-//---
+//----------------------------------------------------------------------------
+void vtkImagePointsIterator::Initialize(
+  vtkImageData *image, const int extent[6], vtkImageStencilData *stencil,
+  vtkAlgorithm *algorithm, int threadId)
+{
+  this->vtkImageRegionIteratorBase::Initialize(
+    image, extent, stencil, algorithm, threadId);
+  image->GetOrigin(this->Origin);
+  image->GetSpacing(this->Spacing);
+  this->UpdatePosition();
+}
