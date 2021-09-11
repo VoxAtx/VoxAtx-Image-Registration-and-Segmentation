@@ -79,4 +79,53 @@ public:
   // Description:
   // Move the iterator to the beginning of the next span.
   // A span is a contiguous region of the image over which nothing but
-  // the point Id 
+  // the point Id and the X index changes.
+  void NextSpan()
+    {
+    this->vtkImageRegionIteratorBase::NextSpan();
+    this->UpdatePointer();
+    }
+
+  // Description:
+  // Test if the iterator has completed iterating over the entire extent.
+  bool IsAtEnd()
+    {
+    return this->vtkImageRegionIteratorBase::IsAtEnd();
+    }
+
+  // Description:
+  // Return a pointer to the beginning of the current span.
+  DType *BeginSpan()
+    {
+    return this->Pointer;
+    }
+
+  // Description:
+  // Return a pointer to the end of the current span.
+  DType *EndSpan()
+    {
+    return this->SpanEndPointer;
+    }
+
+protected:
+
+  // Description:
+  // Update the pointer (called automatically when a new span begins).
+  void UpdatePointer()
+    {
+    this->Pointer = this->BasePointer + this->Id*this->Increment;
+    this->SpanEndPointer = this->BasePointer + this->SpanEnd*this->Increment;
+    }
+
+  // The pointer must be incremented by this amount for each pixel.
+  int Increment;
+
+  // Pointers
+  DType *BasePointer;       // pointer to the first voxel
+  DType *Pointer;           // current iterator position within data
+  DType *SpanEndPointer;    // end of current span
+};
+
+#endif
+#endif
+// VTK-HeaderTest-Exclude: vtkImageRegionIterator.h
