@@ -730,3 +730,1374 @@ vtkImageReader2 *ReadImage(
     {
     reader = ReadDICOMImage(image, matrix, filename, coordSystem);
     }
+
+  // compute the range of values present (between 1st and 99th percentile)
+  double fill[2];
+  ComputeRange(image, vrange, fill);
+
+  // if a pad value was detected, threshold to get rid of it
+  if (fill[1] != 0)
+    {
+    vtkSmartPointer<vtkImageThreshold> thresh =
+      vtkSmartPointer<vtkImageThreshold>::New();
+    thresh->SET_INPUT_DATA(image);
+    thresh->ReplaceInOff();
+    thresh->ReplaceOutOn();
+    thresh->SetOutValue(vrange[0]);
+    if (fill[0] > vrange[1])
+      {
+      thresh->ThresholdByLower(fill[0] - fill[1]);
+      }
+    else
+      {
+      thresh->ThresholdByUpper(fill[0] + fill[1]);
+      }
+    thresh->Update();
+    image->CopyStructure(thresh->GetOutput());
+    image->GetPointData()->PassData(thresh->GetOutput()->GetPointData());
+    }
+
+  // ---------
+  // use vtkImageReslice to eliminate any shear caused by CT tilted gantry
+
+  // use sinc interpolation here unless NN or LA requested
+  if (interpolator != vtkImageRegistration::Nearest &&
+      interpolator != vtkImageRegistration::Label)
+    {
+    interpolator = vtkImageRegistration::Sinc;
+    }
+
+  // get the directions from the patient matrix
+  vtkSmartPointer<vtkMatrix4x4> pmat =
+    vtkSmartPointer<vtkMatrix4x4>::New();
+  pmat->DeepCopy(matrix);
+  double xvec[4] = { 1.0, 0.0, 0.0, 0.0 };
+  double yvec[4] = { 0.0, 1.0, 0.0, 0.0 };
+  pmat->MultiplyPoint(xvec, xvec);
+  pmat->MultiplyPoint(yvec, yvec);
+
+  // create a matrix with z orthogonal to x and y
+  double normal[3];
+  vtkMath::Cross(xvec, yvec, normal);
+  matrix->SetElement(0, 2, normal[0]);
+  matrix->SetElement(1, 2, normal[1]);
+  matrix->SetElement(2, 2, normal[2]);
+
+  // compute the shear matrix
+  vtkSmartPointer<vtkMatrix4x4> rmat =
+    vtkSmartPointer<vtkMatrix4x4>::New();
+  pmat->Invert();
+  vtkMatrix4x4::Multiply4x4(pmat, matrix, rmat);
+
+  // get the parameters that characterize the shear
+  double zdn = rmat->GetElement(2, 2);
+  double xshear = rmat->GetElement(0, 2)/zdn;
+  double yshear = rmat->GetElement(1, 2)/zdn;
+
+  if (fabs(zdn - 1.0) < 1e-3 && fabs(xshear) < 1e-3)
+    {
+    // pure gantry tilt shear matrix will have only one element that
+    // is different from the identity matrix, so enforce this exactly:
+    xshear = 0;
+    zdn = 1.0;
+    rmat->Identity();
+    rmat->SetElement(1, 2, yshear);
+    }
+
+  // if shear is not insignificant, resample on an orthogonal grid
+  if (fabs(xshear) > 1e-3 || fabs(yshear) > 1e-3)
+    {
+    double origin[3], spacing[3];
+    int extent[6];
+    image->GetOrigin(origin);
+    image->GetSpacing(spacing);
+    image->GetExtent(extent);
+    // adjust the spacing if necessary
+    spacing[2] *= zdn;
+    origin[2] *= zdn;
+    // adjust the origin to centre the new volume on the old trapezoid
+    origin[0] -= xshear*0.5*spacing[2]*(extent[5] - extent[4]);
+    origin[1] -= yshear*0.5*spacing[2]*(extent[5] - extent[4]);
+
+    vtkSmartPointer<vtkImageReslice> reslice =
+      vtkSmartPointer<vtkImageReslice>::New();
+    reslice->SetResliceAxes(rmat);
+    reslice->SET_INPUT_DATA(image);
+    reslice->SetOutputOrigin(origin);
+    reslice->SetOutputSpacing(spacing);
+    reslice->SetOutputExtent(extent);
+    reslice->SetBackgroundLevel(vrange[0]);
+    SetInterpolator(reslice, interpolator);
+    reslice->Update();
+
+    image->CopyStructure(reslice->GetOutput());
+    image->GetPointData()->PassData(reslice->GetOutput()->GetPointData());
+    }
+
+  return reader;
+}
+
+int CoordSystem(const char *filename)
+{
+  int t = GuessFileType(filename);
+
+  if (t == MINCImage || t == NIFTIImage)
+    {
+    return NIFTICoords;
+    }
+
+  return DICOMCoords;
+}
+
+void WriteImage(
+  vtkImageReader2 *sourceReader, vtkImageReader2 *targetReader,
+  vtkImageData *image, vtkMatrix4x4 *matrix,
+  const char *filename, int coordSystem, int interpolator)
+{
+#ifdef AIRS_USE_DICOM
+  // check if tilted-gantry images must be produced
+  vtkSmartPointer<vtkImageReslice> reslice =
+    vtkSmartPointer<vtkImageReslice>::New();
+
+  // use sinc interpolation here unless NN or LA requested
+  if (interpolator != vtkImageRegistration::Nearest &&
+      interpolator != vtkImageRegistration::Label)
+    {
+    interpolator = vtkImageRegistration::Sinc;
+    }
+
+  vtkDICOMReader *reader = vtkDICOMReader::SafeDownCast(sourceReader);
+  if (reader)
+    {
+    // get the directions from the patient matrix
+    vtkSmartPointer<vtkMatrix4x4> pmat =
+      vtkSmartPointer<vtkMatrix4x4>::New();
+    pmat->DeepCopy(reader->GetPatientMatrix());
+
+    // compute the shear matrix
+    vtkSmartPointer<vtkMatrix4x4> rmat =
+      vtkSmartPointer<vtkMatrix4x4>::New();
+    rmat->DeepCopy(matrix);
+    rmat->Invert();
+    vtkMatrix4x4::Multiply4x4(rmat, pmat, rmat);
+
+    // get the parameters that characterize the shear
+    double zdn = rmat->GetElement(2, 2);
+    double xshear = rmat->GetElement(0, 2)/zdn;
+    double yshear = rmat->GetElement(1, 2)/zdn;
+
+    if (fabs(zdn - 1.0) < 1e-3 && fabs(xshear) < 1e-3)
+      {
+      // pure gantry tilt shear matrix will have only one element that
+      // is different from the identity matrix, so enforce this exactly:
+      xshear = 0;
+      zdn = 1.0;
+      rmat->Identity();
+      rmat->SetElement(1, 2, yshear);
+      }
+
+    // if shear is not insignificant, resample on an orthogonal grid
+    if (fabs(xshear) > 1e-3 || fabs(yshear) > 1e-3)
+      {
+      double origin[3], spacing[3];
+      int extent[6];
+      image->GetOrigin(origin);
+      image->GetSpacing(spacing);
+      image->GetExtent(extent);
+      // adjust the spacing if necessary
+      spacing[2] *= zdn;
+      origin[2] *= zdn;
+      // adjust the origin to keep everything centered
+      origin[0] -= xshear*0.5*spacing[2]*(extent[5] - extent[4]);
+      origin[1] -= yshear*0.5*spacing[2]*(extent[5] - extent[4]);
+
+      reslice->SetResliceAxes(rmat);
+      reslice->SET_INPUT_DATA(image);
+      reslice->SetOutputOrigin(origin);
+      reslice->SetOutputSpacing(spacing);
+      reslice->SetOutputExtent(extent);
+      SetInterpolator(reslice, interpolator);
+      reslice->Update();
+
+      image = reslice->GetOutput();
+      matrix = reader->GetPatientMatrix();
+      }
+    }
+#endif
+
+  int t = GuessFileType(filename);
+
+  if (t == MINCImage)
+    {
+    WriteMINCImage(
+      sourceReader, targetReader, image, matrix, filename, coordSystem);
+    }
+  else if (t == NIFTIImage)
+    {
+#ifdef AIRS_USE_NIFTI
+    WriteNIFTIImage(
+      sourceReader, targetReader, image, matrix, filename, coordSystem);
+#else
+    fprintf(stderr, "NIFTI files are not supported.\n");
+    exit(1);
+#endif
+    }
+  else
+    {
+#ifdef AIRS_USE_DICOM
+    WriteDICOMImage(
+      sourceReader, targetReader, image, matrix, filename, coordSystem);
+#else
+    fprintf(stderr, "Writing DICOM files is not supported.\n");
+    exit(1);
+#endif
+    }
+}
+
+
+// Write a csv file that can be used to plot the convergence of the
+// registration.  The first column is the function evaluation count,
+// the second column is the cost, the fourth is the metric value,
+// and the remainder of the columns are the parameters.
+void WriteReport(vtkImageRegistration *reg, const char *fname)
+{
+  vtkDoubleArray *costArray = reg->GetCostValues();
+  vtkDoubleArray *metricArray = reg->GetMetricValues();
+  vtkDoubleArray *paramArray = reg->GetParameterValues();
+
+  FILE *f = fopen(fname, "w");
+  if (!f)
+    {
+    fprintf(stderr, "Unable to open output file %s\n", fname);
+    return;
+    }
+
+  // get the number of free parameters
+  int dof = paramArray->GetNumberOfComponents();
+
+  // get the parameter names
+  const char **pnames = 0;
+  if (reg->GetTransformDimensionality() == 2)
+    {
+    static const char *p[] = {
+      "tx", "ty", "r", "s", "a", "q"
+    }; 
+    pnames = p;
+    }
+  else
+    {
+    static const char *p[] = {
+      "tx", "ty", "tz", "rx", "ry", "rz", "s", "a", "b", "qx", "qy", "qz"
+    }; 
+    pnames = p;
+    }
+
+  // print the header
+  fprintf(f, "\"%s\",\"%s\",\"%s\"", "feval", "cost", "metric");
+  for (int k = 0; k < dof; k++)
+    {
+    fprintf(f, ",\"%s\"", pnames[k]);
+    }
+  fprintf(f, "\n");
+
+  int n = static_cast<int>(costArray->GetNumberOfTuples());
+  int j = 0;
+  for (int i = 0; i < n; i++)
+    {
+    // Only report decreasing values, because we want to show the path
+    // taken towards convergence
+    if (costArray->GetValue(i) <= costArray->GetValue(j))
+      {
+      j = i;
+      }
+    else
+      {
+      continue;
+      }
+
+    double params[12] = {
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    };
+    paramArray->GetTuple(j, params);
+
+    fprintf(f, "%i,%g,%g",
+            i, costArray->GetValue(j), metricArray->GetValue(j));
+
+    for (int k = 0; k < dof; k++)
+      {
+      fprintf(f, ",%g", params[k]);
+      }
+    fprintf(f, "\n");
+    }
+
+  fclose(f);
+}
+
+
+void SetViewFromMatrix(
+  vtkRenderer *renderer,
+  vtkInteractorStyleImage *istyle,
+  vtkMatrix4x4 *matrix,
+  int coordSystem)
+{
+  istyle->SetCurrentRenderer(renderer);
+
+  // This view assumes the data uses the DICOM Patient Coordinate System.
+  // It provides a right-is-left view of axial and coronal images
+  double viewRight[4] = { 1.0, 0.0, 0.0, 0.0 };
+  double viewUp[4] = { 0.0, 1.0, 0.0, 0.0 };
+
+  if (coordSystem == DICOMCoords)
+    {
+    viewUp[1] = -1.0;
+    }
+
+  matrix->MultiplyPoint(viewRight, viewRight);
+  matrix->MultiplyPoint(viewUp, viewUp);
+
+  istyle->SetImageOrientation(viewRight, viewUp);
+}
+
+// a class to look for errors when reading transforms.
+class ErrorObserver : public vtkCommand
+{
+public:
+  static ErrorObserver *New() { return new ErrorObserver; }
+  vtkTypeMacro(ErrorObserver, vtkCommand);
+  virtual void Execute(vtkObject *o, unsigned long eventId, void *callData);
+};
+
+void ErrorObserver::Execute(
+  vtkObject *, unsigned long, void *callData)
+{
+  if (callData)
+    {
+    fprintf(stderr, "%s\n", static_cast<char *>(callData));
+    }
+  exit(1);
+}
+
+void ReadMatrix(vtkMatrix4x4 *matrix, const char *xfminput)
+{
+  vtkSmartPointer<ErrorObserver> observer =
+    vtkSmartPointer<ErrorObserver>::New();
+  int t = GuessFileType(xfminput);
+
+  if (t == MNITransform) // .xfm
+    {
+    // MNI transform file (always in RAS coords)
+    vtkSmartPointer<vtkMNITransformReader> reader =
+      vtkSmartPointer<vtkMNITransformReader>::New();
+    reader->SetFileName(xfminput);
+    reader->AddObserver(vtkCommand::ErrorEvent, observer);
+    reader->Update();
+    vtkLinearTransform *transform =
+      vtkLinearTransform::SafeDownCast(reader->GetTransform());
+    if (transform)
+      {
+      matrix->DeepCopy(transform->GetMatrix());
+      }
+    else
+      {
+      fprintf(stderr, "Unable to read input transform %s\n", xfminput);
+      exit(1);
+      }
+    }
+  else if (t == ITKTransform) // .tfm
+    {
+    // ITK transform file (always in DICOM coords)
+    vtkSmartPointer<vtkITKXFMReader> reader =
+      vtkSmartPointer<vtkITKXFMReader>::New();
+    reader->SetFileName(xfminput);
+    reader->AddObserver(vtkCommand::ErrorEvent, observer);
+    reader->Update();
+    vtkLinearTransform *transform =
+      vtkLinearTransform::SafeDownCast(reader->GetTransform());
+    if (transform)
+      {
+      matrix->DeepCopy(transform->GetMatrix());
+      }
+    else
+      {
+      fprintf(stderr, "Unable to read input transform %s\n", xfminput);
+      exit(1);
+      }
+    }
+  else
+    {
+    // text file
+    double elements[16] = {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0 };
+
+    ifstream infile(xfminput);
+    int i = 0;
+    while (infile.good() && i < 16)
+      {
+      infile >> elements[i];
+      if (infile.fail() && !infile.bad())
+        {
+        infile.clear();
+        infile.get();
+        }
+      else
+        {
+        i++;
+        }
+      }
+    infile.close();
+    if (i < 16)
+      {
+      fprintf(stderr, "Unable to read input transform %s\n", xfminput);
+      exit(1);
+      }
+    matrix->DeepCopy(elements);
+    }
+}
+
+void WriteMatrix(
+  vtkMatrix4x4 *matrix, const char *xfmfile, const double center[3])
+{
+  vtkSmartPointer<ErrorObserver> observer =
+    vtkSmartPointer<ErrorObserver>::New();
+  vtkSmartPointer<vtkTransform> transform =
+    vtkSmartPointer<vtkTransform>::New();
+  transform->Concatenate(matrix);
+
+  int t = GuessFileType(xfmfile);
+
+  if (t == MNITransform) // .xfm
+    {
+    // MNI transform file (always in RAS coords)
+    vtkSmartPointer<vtkMNITransformWriter> writer =
+      vtkSmartPointer<vtkMNITransformWriter>::New();
+    writer->SetFileName(xfmfile);
+    writer->SetTransform(transform);
+    writer->AddObserver(vtkCommand::ErrorEvent, observer);
+    writer->Update();
+    }
+  else if (t == ITKTransform) // .tfm
+    {
+    // ITK transform file (always in DICOM coords)
+    vtkSmartPointer<vtkITKXFMWriter> writer =
+      vtkSmartPointer<vtkITKXFMWriter>::New();
+    writer->SetFileName(xfmfile);
+    writer->SetTransform(transform);
+    writer->SetTransformCenter(center);
+    writer->AddObserver(vtkCommand::ErrorEvent, observer);
+    writer->Write();
+    }
+  else
+    {
+    // Delimited text file
+    const char *delim = ((t == CSVTransform) ? "," : "\t");
+    std::ofstream outfile(xfmfile, ios::out);
+    for (int i = 0; i < 4; i++)
+      {
+      outfile << std::setprecision(10)
+              << matrix->Element[i][0] << delim
+              << matrix->Element[i][1] << delim
+              << matrix->Element[i][2] << delim
+              << matrix->Element[i][3] << "\n";
+      }
+    if (!outfile.good())
+      {
+      fprintf(stderr, "Unable to write output transform.\n");
+      exit(1);
+      }
+    outfile.close();
+    }
+}
+
+void WriteScreenshot(vtkWindow *window, const char *filename)
+{
+  vtkSmartPointer<vtkWindowToImageFilter> snap =
+    vtkSmartPointer<vtkWindowToImageFilter>::New();
+  snap->SetInput(window);
+  snap->Update();
+
+  size_t l = strlen(filename);
+  if (l >= 4 && strcmp(filename + (l - 4), ".png") == 0)
+    {
+    vtkSmartPointer<vtkPNGWriter> snapWriter =
+      vtkSmartPointer<vtkPNGWriter>::New();
+    snapWriter->SetInputConnection(snap->GetOutputPort());
+    snapWriter->SetFileName(filename);
+    snapWriter->Write();
+    }
+  else if ((l >= 4 && strcmp(filename + (l - 4), ".jpg") == 0) ||
+           (l >= 5 && strcmp(filename + (l - 5), ".jpeg") == 0))
+    {
+    vtkSmartPointer<vtkJPEGWriter> snapWriter =
+      vtkSmartPointer<vtkJPEGWriter>::New();
+    snapWriter->SetInputConnection(snap->GetOutputPort());
+    snapWriter->SetFileName(filename);
+    snapWriter->Write();
+    }
+  else if ((l >= 4 && strcmp(filename + (l - 4), ".tif") == 0) ||
+           (l >= 5 && strcmp(filename + (l - 5), ".tiff") == 0))
+    {
+    vtkSmartPointer<vtkTIFFWriter> snapWriter =
+      vtkSmartPointer<vtkTIFFWriter>::New();
+    snapWriter->SetInputConnection(snap->GetOutputPort());
+    snapWriter->SetFileName(filename);
+    snapWriter->Write();
+    }
+}
+
+void ComputeRange(vtkImageData *image, double range[2], double fill[2])
+{
+  // compute the range within a cylinder that is slightly smaller than
+  // the image bounds (the idea is to capture only the reconstructed
+  // portion of a CT image).
+  double spacing[3];
+  double origin[3];
+  int extent[6];
+  double bounds[6];
+  image->GetSpacing(spacing);
+  image->GetOrigin(origin);
+  image->GetExtent(extent);
+
+  for (int i = 0; i < 3; ++i)
+    {
+    double b1 = extent[2*i]*spacing[i] + origin[i];
+    double b2 = extent[2*i+1]*spacing[i] + origin[i];
+    bounds[2*i] = (b1 < b2 ? b1 : b2);
+    bounds[2*i+1] = (b1 < b2 ? b2 : b1);
+    spacing[i] = fabs(spacing[i]);
+    origin[i] = bounds[2*i];
+    // reduce bounds by 2% in X and Y for use in cylinder generation
+    double bl = (i == 2 ? 0.0 : 0.01*(bounds[2*i+1] - bounds[2*i]));
+    bounds[2*i] += bl;
+    bounds[2*i+1] -= bl;
+    }
+
+  // extract just the reconstructed portion of CT image
+  vtkSmartPointer<vtkROIStencilSource> cylinder =
+    vtkSmartPointer<vtkROIStencilSource>::New();
+
+  cylinder->SetShapeToCylinderZ();
+  cylinder->SetInformationInput(image);
+  cylinder->SetBounds(bounds);
+  cylinder->Update();
+
+  // get the range within the cylinder
+  vtkSmartPointer<vtkImageHistogramStatistics> rangeFinder =
+    vtkSmartPointer<vtkImageHistogramStatistics>::New();
+
+  rangeFinder->SET_INPUT_DATA(image);
+  rangeFinder->SET_STENCIL_DATA(cylinder->GetOutput());
+  rangeFinder->Update();
+
+  rangeFinder->GetAutoRange(range);
+
+  // run again, with no cylinder stencil
+  rangeFinder->SET_STENCIL_DATA(0);
+  rangeFinder->SetMaximumNumberOfBins(65536);
+  rangeFinder->Modified();
+  rangeFinder->Update();
+
+  // get the histogram and find the bin with highest frequency that
+  // is not within the range of values that we just found
+  vtkIdTypeArray *histogram = rangeFinder->GetHistogram();
+  double binSpacing = rangeFinder->GetBinSpacing();
+  double binOrigin = rangeFinder->GetBinOrigin();
+  vtkIdType numBins = histogram->GetMaxId() + 1;
+  vtkIdType maxBin = -1;
+  vtkIdType maxCount = 0;
+  vtkIdType brange[2];
+  brange[0] = static_cast<vtkIdType>((range[0] - binOrigin)/binSpacing + 0.5);
+  brange[1] = static_cast<vtkIdType>((range[1] - binOrigin)/binSpacing + 0.5);
+  if (brange[0] < 0) { brange[0] = 0; }
+  if (brange[1] < brange[0]) { brange[1] = brange[0]; }
+  if (brange[1] > numBins-1) { brange[1] = numBins-1; }
+
+  vtkIdType total = 0;
+  for (vtkIdType bin = 0; bin <= brange[0]; bin++)
+    {
+    vtkIdType count = histogram->GetValue(bin);
+    total += count;
+    if (count > maxCount)
+      {
+      maxCount = count;
+      maxBin = bin;
+      }
+    }
+  for (vtkIdType bin = brange[1]; bin < numBins; bin++)
+    {
+    vtkIdType count = histogram->GetValue(bin);
+    total += count;
+    if (count > maxCount)
+      {
+      maxCount = count;
+      maxBin = bin;
+      }
+    }
+  // if one bin accounts for most of the out-of-range values,
+  // then that bin must be a fill value rather than real data
+  if (maxCount > total/2 && maxCount > rangeFinder->GetTotal()/10)
+    {
+    fill[0] = maxBin*binSpacing + binOrigin;
+    fill[1] = binSpacing;
+    // finally, need to re-check the original range, maybe it actually did
+    // include the fill value!
+    if (maxBin == brange[0])
+      {
+      vtkIdType bin;
+      for (bin = brange[0]+1; bin < brange[1]; bin++)
+        {
+        if (histogram->GetValue(bin) != 0) { break; }
+        }
+      if (bin < brange[1] && bin - brange[0] > 4)
+        {
+        range[0] = bin*binSpacing + binOrigin;
+        }
+      }
+    else if (maxBin == brange[1])
+      {
+      vtkIdType bin;
+      for (bin = brange[1]-1; bin > brange[0]; bin--)
+        {
+        if (histogram->GetValue(bin) != 0) { break; }
+        }
+      if (bin > brange[0] && brange[1] - bin > 4)
+        {
+        range[1] = bin*binSpacing + binOrigin;
+        }
+      }
+    }
+  else
+    {
+    fill[0] = 0;
+    fill[1] = 0;
+    }
+}
+
+};
+
+class TransformArg
+{
+public:
+  TransformArg(const char *t, bool i) :
+    filename(t), invert(i) {}
+
+  const char *filename;
+  bool invert;
+};
+
+struct register_options
+{
+  int dimensionality;  // -D --dimensionality
+  int metric;          // -M --metric
+  int transform;       // -T --transform
+  int interpolator;    // -I --interpolator
+  int optimizer;       // -O --optimizer
+  int parallel;        // -P --parallel
+  int coords;          // -C --coords
+  int maxeval[4];      // -N --maxeval
+  int display;         // -d --display
+  int translucent;     // -t --translucent
+  int silent;          // -s --silent
+#ifdef VTK_HAS_SLAB_SPACING
+  int mip;             // --mip
+#endif
+  int source_to_target; // --source-to-target
+  const char *outxfm;  // -o (output transform)
+  const char *output;  // -o (output image)
+  const char *screenshot; // -j (output screenshot)
+  const char *report;  // -r (report csv file)
+  const char *source;
+  const char *target;
+  std::vector<TransformArg> transforms;
+};
+
+void register_initialize_options(register_options *options)
+{
+  options->dimensionality = 3;
+  options->metric = vtkImageRegistration::MutualInformation;
+  options->transform = vtkImageRegistration::Rigid;
+  options->interpolator = vtkImageRegistration::Linear;
+  options->optimizer = vtkImageRegistration::Powell;
+  options->parallel = MultiThread;
+  options->coords = NativeCoords;
+  options->maxeval[0] = 5000;
+  options->maxeval[1] = 5000;
+  options->maxeval[2] = 5000;
+  options->maxeval[3] = 5000;
+  options->display = 0;
+  options->translucent = 0;
+  options->silent = 0;
+#ifdef VTK_HAS_SLAB_SPACING
+  options->mip = 0;
+#endif
+  options->source_to_target = 0;
+  options->screenshot = NULL;
+  options->report = NULL;
+  options->output = NULL;
+  options->outxfm = NULL;
+  options->source = NULL;
+  options->target = NULL;
+  options->transforms.clear();
+}
+
+const char *check_next_arg(
+  int argc, char *argv[], int *argi, const char *possib[])
+{
+  const char *op = argv[*argi - 1];
+  if (*argi >= argc ||
+      argv[*argi][0] == '-')
+    {
+    fprintf(stderr, "The option \"%s\" must be followed by an argument\n", op);
+    exit(1);
+    }
+  const char *arg = argv[(*argi)++];
+
+  if (possib == 0)
+    {
+    return arg;
+    }
+
+  bool match = false;
+  for (const char **t = possib; *t != 0; t++)
+    {
+    if (strcmp(*t, arg) == 0)
+      {
+      match = true;
+      break;
+      }
+    }
+
+  if (!match)
+    {
+    fprintf(stderr, "Incorrect value for option \"%s\": %s\n",
+            op, arg);
+    fprintf(stderr, "Allowed values:");
+    for (const char **u = possib; *u != 0; u++)
+      {
+      fprintf(stderr, "%s", *u);
+      }
+    fprintf(stderr, "\n");
+    exit(1);
+    }
+
+  return arg;
+}
+
+void register_show_usage(FILE *fp, const char *command)
+{
+  const char *cp = command + strlen(command);
+  while (cp > command && cp[-1] != '/' && cp[-1] != '\\') { --cp; }
+
+  fprintf(fp,
+    "Usage: %s [options] -o <output> <source image> <target image>\n", cp);
+  fprintf(fp, "\n");
+  fprintf(fp,
+    "For more information, type \"%s --help\"\n\n", command);
+}
+
+void register_show_help(FILE *fp, const char *command)
+{
+  const char *cp = command + strlen(command);
+  while (cp > command && cp[-1] != '/' && cp[-1] != '\\') { --cp; }
+
+  fprintf(fp,
+    "Usage: %s [options] -o <output> <source image> <target image>\n", cp);
+  fprintf(fp,
+    "\n"
+    "Written by David Gobbi <dgobbi@ucalgary.ca> at CIPAC.  Version 0.2.6.\n"
+    "\n"
+    "This program performs 3D image registration on DICOM, MINC, or NIFTI\n"
+    "image volumes.  It reads the image header (or the DICOM meta data) in\n"
+    "order to discover the orientation of the image slices in real-world\n"
+    "coordinates (e.g. the DICOM patient coodinate system for DICOM files,\n"
+    "or \"world coordinates\" for MINC and NIFTI files).  The result of the\n"
+    "registration is that the target image is resampled (i.e. regridded via\n"
+    "interpolation) in order to put it into the same coordinate system as,\n"
+    "and with the same slice geometry as, the source image.\n"
+    "\n"
+    "The registration is performed via a multi-resolution pyramid, starting\n"
+    "with images that have been blurred to four times their original pixel\n"
+    "spacing, proceeding to images that have been blurred to two times their\n"
+    "original spacing, and finishing with unblurred, full-resolution images.\n"
+    "\n"
+    "The \"-o\" option allows you to specify either an output image, or an\n"
+    "output transform file.  The transform file will provide the coordinate\n"
+    "transformation from the source image space to the target image space.\n"
+    "This \"space\" is the coordinate system specified by the image header.\n"
+    "\n"
+    "If you have a transform file and want to apply it to another image,\n"
+    "the transform file can be provided as an input to the program, and the\n"
+    "number of registration iterations can be set to zero (-N 0) in order\n"
+    "to apply the transform directly without performing another registration.\n"
+    "Multiple transforms can be specified this way, they will be concatenated\n"
+    "before they are applied to the image.  For instance, if \'A.tfm B.tfm\'\n"
+    "are specified on the command line, then transform BA will be used as the\n"
+    "initial source-to-target transformation.  The \'-i\' option can be placed\n"
+    "before any transform to invert that transform.\n"
+    "\n");
+  fprintf(fp,
+    " -D --dimensionality   (default: 3)\n"
+    "                 2\n"
+    "                 3\n"
+    "\n"
+    "    If the dimensionality is set to 2 for a 3D file, then the\n"
+    "    registration will be limited to in-plane transformations.\n"
+    "\n"
+    " -M --metric           (default MutualInformation)\n"
+    "                 SD        SquaredDifference\n"
+    "                 CC        CrossCorrelation\n"
+    "                 NCC       NormalizedCrossCorrelation\n"
+    "                 NC        NeighborhoodCorrelation\n"
+    "                 CR        CorrelationRatio\n"
+    "                 MI        MutualInformation\n"
+    "                 NMI       NormalizedMutualInformation\n"
+    "\n"
+    "    Mutual information (the default) should be used in most cases.\n"
+    "    Normalized Mutual information may be more robust (but not more\n"
+    "    accurate) if one input or both inputs are only a small part\n"
+    "    of the organ or anatomy that is being registered.\n"
+    "\n"
+    " -T --transform        (default: Rigid)\n"
+    "                 TR        Translation\n"
+    "                 RI        Rigid\n"
+    "                 SI        Similarity\n"
+    "                 SS        ScaleSourceAxes\n"
+    "                 ST        ScaleTargetAxes\n"
+    "                 AF        Affine\n"
+    "\n"
+    "    A rigid transform should always be used for intra-subject\n"
+    "    registration.  For inter-subject registration, the SS and ST\n"
+    "    transforms restrict the scale part of the transformation to be\n"
+    "    either along the directions of the source image axes, or along\n"
+    "    the directions of the target image axes.  The transform goes from\n"
+    "    the coordinate system of the source image to the coordinate system\n"
+    "    of the target image.\n"
+    "\n"
+    " -I --interpolator     (default: Linear)\n"
+    "                 NN        NearestNeighbor\n"
+    "                 LI        Linear\n"
+    "                 CU        Cubic\n"
+    "                 BS        BSpline\n"
+    "                 WS        WindowedSinc\n"
+    "                 AS        Antialiasing\n"
+    "                 LA        Label\n"
+    "\n"
+    "    Linear interpolation is usually the best choice, it provides\n"
+    "    a good balance between efficiency and quality.  Either Label or\n"
+    "    NearestNeighbor is required if one of the images is a label image.\n"
+    "    The Windowed Sinc interpolator uses a five-lobe Blackman-windowed\n"
+    "    sinc kernel and offers the highest overall quality, while the\n"
+    "    the Antialiasing interpolator uses a five-lobe Blackman-windowed\n"
+    "    sinc that has been widened in order to bandlimit the image for\n"
+    "    the output sample spacing.  The image that is interpolated is the\n"
+    "    target image.\n"
+    "\n"
+    " -O --optimizer        (default: Powell)\n"
+    "                 PW        Powell\n"
+    "                 NM        Amoeba\n"
+    "\n"
+    "    The Powell optimizer generally converges much faster than Amoeba,\n"
+    "    where the latter is the Nelder-Mead downhill simplex method.\n"
+    "\n"
+    " -P --parallel         (default: MultiThread)\n"
+    "                 MT        MultiThread\n"
+    "                 TP        ThreadPool\n"
+    "                 Off\n"
+    "\n"
+    "    This option controls parallel processing.  The default is to use\n"
+    "    whichever option was configured when the program was built.  The\n"
+    "    MultiThread option breaks each image-processing operation into\n"
+    "    a number of pieces equal to the number of available threads, while\n"
+    "    the ThreadPool option breaks the operations into very small pieces\n"
+    "    that are submitted to a parallel queue for processing.  The thread\n"
+    "    pool can be configured to use TBB or OpenMP at build time.\n"
+    "\n"
+    " -C --coords           (default: guess from file type)\n"
+    "                 DICOM     LPS\n"
+    "                 NIFTI     RAS\n"
+    "                 MINC      RAS\n"
+    "\n"
+    "    The DICOM standard defines a patient coordinate system where the\n"
+    "    x-axis points left, the y-axis points towards the back, and the\n"
+    "    z-axis points towards the head.  NIFTI and MINC use a coordinate\n"
+    "    system where x points right and y points towards the front.  The\n"
+    "    matrix that is written by the \"-o\" option will be in the chosen\n"
+    "    coordinate system.\n"
+    "\n"
+    " -N --maxeval   (default: 5000x5000x5000x5000)\n"
+    "\n"
+    "    Set the maximum number of metric evaluations per stage.  Set this\n"
+    "    to zero if you want to use the initial transform as-is.\n"
+#ifdef VTK_HAS_SLAB_SPACING
+    "\n"
+    " --mip             (default: off)\n"
+    "\n"
+    "    Do a maximum intensity projection for each output slice.  This is\n"
+    "    useful for angiography, since it ensures that vessels will not be\n"
+    "    lost.\n"
+#endif
+    "\n"
+    " -d --display      (default: off)\n"
+    "\n"
+    "    Display the images during the registration.\n"
+    "\n"
+    " -t --translucent (default: off)\n"
+    "\n"
+    "    Display the images with translucency (rather than checkerboard).\n"
+    "\n"
+    " -s --silent       (default: off)\n"
+    "\n"
+    "    Do not print information to the console during the registration.\n"
+    "    This is useful when running in batch mode.  Error messages will\n"
+    "    still be printed.\n"
+    "\n"
+    " -j --screenshot <file>\n"
+    "\n"
+    "    Write a screenshot as a png, jpeg, or tiff file.  This is useful\n"
+    "    when performing registration in a batch file in order to provide\n"
+    "    a simple means of visually assessing the results retrospectively.\n"
+    "\n"
+    " -r --report <file>\n"
+    "\n"
+    "    Write a report in csv format that shows the convergence.  This is\n"
+    "    for testing the metrics.\n"
+    "\n"
+    " -o <file>\n"
+    "\n"
+    "    Provide a file for the resulting transform or image to be written\n"
+    "    to.  If you want to write both a transform file and an image file,\n"
+    "    then use the -o option twice (once for each desired output).\n"
+    "    For a transform output, the transform that is written goes from the\n"
+    "    source image patient coordinate system to the target image patient\n"
+    "    coordinate system.  For an image output, the target image is\n"
+    "    resampled to match the geometry of the source image.\n"
+    "\n"
+    " -i --invert <transform>\n"
+    "\n"
+    "    Use the inverse of the given transform as the initial transform.\n"
+    "\n");
+}
+
+int register_read_options(
+  int argc, char *argv[], register_options *options)
+{
+  static const char *dimensionality_args[] = {
+    "2", "3", 0 };
+  static const char *metric_args[] = {
+    "SquaredDifference", "SD",
+    "CrossCorrelation", "CC",
+    "NormalizedCrossCorrelation", "NCC",
+    "NeighborhoodCorrelation", "NC",
+    "CorrelationRatio", "CR",
+    "MutualInformation", "MI",
+    "NormalizedMutualInformation", "NMI",
+    0 };
+  static const char *transform_args[] = {
+    "Translation", "TR",
+    "Rigid", "RI",
+    "Similarity", "SI",
+    "ScaleSourceAxes", "SS",
+    "ScaleTargetAxes", "ST",
+    "Affine", "AF",
+    0 };
+  static const char *interpolator_args[] = {
+    "NearestNeighbor", "NN",
+    "Linear", "LI",
+    "Cubic", "CU",
+    "BSpline", "BS",
+    "WindowedSinc", "WS",
+    "Antialiasing", "AS",
+    "Label", "LA",
+    0 };
+  static const char *optimizer_args[] = {
+    "PW", "Powell",
+    "NM", "Amoeba",
+    0 };
+  static const char *parallel_args[] = {
+    "MT", "MultiThread",
+    "TP", "ThreadPool",
+    "Off",
+    0 };
+  static const char *coords_args[] = {
+    "DICOM", "LPS",
+    "NIFTI", "MINC", "RAS",
+    0 };
+
+  int argi = 1;
+  while (argi < argc)
+    {
+    const char *arg = argv[argi++];
+    if (arg[0] != '-')
+      {
+      int t = GuessFileType(arg);
+
+      if (t <= LastImageType)
+        {
+        if (options->source == 0)
+          {
+          options->source = arg;
+          }
+        else if (options->target == 0)
+          {
+          options->target = arg;
+          }
+        else
+          {
+          fprintf(stderr, "Too many input images listed on command line\n");
+          exit(1);
+          }
+        }
+      else if (t <= LastTransformType)
+        {
+        options->transforms.push_back(TransformArg(arg, false));
+        }
+      }
+    else
+      {
+      if (strcmp(arg, "-h") == 0 ||
+          strcmp(arg, "--help") == 0)
+        {
+        register_show_help(stdout, argv[0]);
+        exit(0);
+        }
+      else if (strcmp(arg, "-D") == 0 ||
+               strcmp(arg, "--dimensionality") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, dimensionality_args);
+        options->dimensionality = (arg[0] == '2' ? 2 : 3);
+        }
+      else if (strcmp(arg, "-M") == 0 ||
+               strcmp(arg, "--metric") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, metric_args);
+        if (strcmp(arg, "SquaredDifference") == 0 ||
+            strcmp(arg, "SD") == 0)
+          {
+          options->metric = vtkImageRegistration::SquaredDifference;
+          }
+        else if (strcmp(arg, "CrossCorrelation") == 0 ||
+                 strcmp(arg, "CC") == 0)
+          {
+          options->metric = vtkImageRegistration::CrossCorrelation;
+          }
+        else if (strcmp(arg, "NormalizedCrossCorrelation") == 0 ||
+                 strcmp(arg, "NCC") == 0)
+          {
+          options->metric = vtkImageRegistration::NormalizedCrossCorrelation;
+          }
+        else if (strcmp(arg, "NeighborhoodCorrelation") == 0 ||
+                 strcmp(arg, "NC") == 0)
+          {
+          options->metric = vtkImageRegistration::NeighborhoodCorrelation;
+          }
+        else if (strcmp(arg, "CorrelationRatio") == 0 ||
+                 strcmp(arg, "CR") == 0)
+          {
+          options->metric = vtkImageRegistration::CorrelationRatio;
+          }
+        else if (strcmp(arg, "MutualInformation") == 0 ||
+                 strcmp(arg, "MI") == 0)
+          {
+          options->metric = vtkImageRegistration::MutualInformation;
+          }
+        else if (strcmp(arg, "NormalizedMutualInformation") == 0 ||
+                 strcmp(arg, "NMI") == 0)
+          {
+          options->metric = vtkImageRegistration::NormalizedMutualInformation;
+          }
+        }
+      else if (strcmp(arg, "-T") == 0 ||
+               strcmp(arg, "--transform") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, transform_args);
+        if (strcmp(arg, "Translation") == 0 ||
+            strcmp(arg, "TR") == 0)
+          {
+          options->transform = vtkImageRegistration::Translation;
+          }
+        else if (strcmp(arg, "Rigid") == 0 ||
+                 strcmp(arg, "RI") == 0)
+          {
+          options->transform = vtkImageRegistration::Rigid;
+          }
+        else if (strcmp(arg, "Similarity") == 0 ||
+                 strcmp(arg, "SI") == 0)
+          {
+          options->transform = vtkImageRegistration::Similarity;
+          }
+        else if (strcmp(arg, "ScaleSourceAxes") == 0 ||
+                 strcmp(arg, "SS") == 0)
+          {
+          options->transform = vtkImageRegistration::ScaleSourceAxes;
+          }
+        else if (strcmp(arg, "ScaleTargetAxes") == 0 ||
+                 strcmp(arg, "ST") == 0)
+          {
+          options->transform = vtkImageRegistration::ScaleTargetAxes;
+          }
+        else if (strcmp(arg, "Affine") == 0 ||
+                 strcmp(arg, "AF") == 0)
+          {
+          options->transform = vtkImageRegistration::Affine;
+          }
+        }
+      else if (strcmp(arg, "-I") == 0 ||
+               strcmp(arg, "--interpolator") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, interpolator_args);
+        if (strcmp(arg, "NearestNeighbor") == 0 ||
+            strcmp(arg, "NN") == 0)
+          {
+          options->interpolator = vtkImageRegistration::Nearest;
+          }
+        else if (strcmp(arg, "Linear") == 0 ||
+                 strcmp(arg, "LI") == 0)
+          {
+          options->interpolator = vtkImageRegistration::Linear;
+          }
+        else if (strcmp(arg, "Cubic") == 0 ||
+                 strcmp(arg, "CU") == 0)
+          {
+          options->interpolator = vtkImageRegistration::Cubic;
+          }
+        else if (strcmp(arg, "BSpline") == 0 ||
+                 strcmp(arg, "BS") == 0)
+          {
+          options->interpolator = vtkImageRegistration::BSpline;
+          }
+        else if (strcmp(arg, "WindowedSinc") == 0 ||
+                 strcmp(arg, "WS") == 0)
+          {
+          options->interpolator = vtkImageRegistration::Sinc;
+          }
+        else if (strcmp(arg, "Antialiasing") == 0 ||
+                 strcmp(arg, "AS") == 0)
+          {
+          options->interpolator = vtkImageRegistration::ASinc;
+          }
+        else if (strcmp(arg, "Label") == 0 ||
+                 strcmp(arg, "LA") == 0)
+          {
+          options->interpolator = vtkImageRegistration::Label;
+          }
+        }
+      else if (strcmp(arg, "-O") == 0 ||
+               strcmp(arg, "--optimizer") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, optimizer_args);
+        if (strcmp(arg, "Amoeba") == 0 ||
+            strcmp(arg, "NM") == 0)
+          {
+          options->optimizer = vtkImageRegistration::Amoeba;
+          }
+        else if (strcmp(arg, "Powell") == 0 ||
+                 strcmp(arg, "PW") == 0)
+          {
+          options->optimizer = vtkImageRegistration::Powell;
+          }
+        }
+      else if (strcmp(arg, "-P") == 0 ||
+               strcmp(arg, "--parallel") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, parallel_args);
+        if (strcmp(arg, "MultiThread") == 0 ||
+            strcmp(arg, "MT") == 0)
+          {
+          options->parallel = MultiThread;
+          }
+        else if (strcmp(arg, "ThreadPool") == 0 ||
+                 strcmp(arg, "TP") == 0)
+          {
+          options->parallel = ThreadPool;
+          }
+        else
+          {
+          options->parallel = 0;
+          }
+        }
+      else if (strcmp(arg, "-C") == 0 ||
+               strcmp(arg, "--coords") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, coords_args);
+        if (strcmp(arg, "DICOM") == 0 ||
+            strcmp(arg, "LPS") == 0)
+          {
+          options->coords = DICOMCoords;
+          }
+        else if (strcmp(arg, "MINC") == 0 ||
+                 strcmp(arg, "NIFTI") == 0 ||
+                 strcmp(arg, "RAS") == 0)
+          {
+          options->coords = NIFTICoords;
+          }
+        }
+      else if (strcmp(arg, "-N") == 0 ||
+               strcmp(arg, "--maxeval") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        for (int i = 0; i < 4; i++)
+          {
+          options->maxeval[i] = static_cast<int>(
+            strtoul(arg, const_cast<char **>(&arg), 0));
+          if (*arg == 'x') { arg++; }
+          }
+        }
+      else if (strcmp(arg, "-d") == 0 ||
+               strcmp(arg, "--display") == 0)
+        {
+        options->display = 1;
+        }
+      else if (strcmp(arg, "-t") == 0 ||
+               strcmp(arg, "--translucent") == 0)
+        {
+        options->translucent = 1;
+        }
+#ifdef VTK_HAS_SLAB_SPACING
+      else if (strcmp(arg, "--mip") == 0)
+        {
+        options->mip = 1;
+        }
+#endif
+      else if (strcmp(arg, "--source-to-target") == 0)
+        {
+        options->source_to_target = 1;
+        }
+      else if (strcmp(arg, "-s") == 0 ||
+               strcmp(arg, "--silent") == 0)
+        {
+        options->silent = 1;
+        }
+      else if (strcmp(arg, "-i") == 0 ||
+               strcmp(arg, "--invert") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        int t = GuessFileType(arg);
+
+        if (t > LastImageType && t <= LastTransformType)
+          {
+          options->transforms.push_back(TransformArg(arg, true));
+          }
+        else
+          {
+          fprintf(stderr,
+                  "The \"-i\" option must be followed by a transform\n");
+          exit(1);
+          }
+        }
+      else if (strcmp(arg, "-j") == 0 ||
+               strcmp(arg, "--screenshot") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        options->screenshot = arg;
+        }
+      else if (strcmp(arg, "-r") == 0 ||
+               strcmp(arg, "--report") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        options->report = arg;
+        }
+      else if (strcmp(arg, "-o") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        int t = GuessFileType(arg);
+        if (t <= LastImageType)
+          {
+          if (options->output)
+            {
+            fprintf(stderr, "Too many -o options specified!\n");
+            register_show_usage(stderr, argv[0]);
+            }
+          options->output = arg;
+          }
+        else if (t <= LastTransformType)
+          {
+          if (options->outxfm)
+            {
+            fprintf(stderr, "Too many -o options specified!\n");
+            register_show_usage(stderr, argv[0]);
+            }
+          options->outxfm = arg;
+          }
+        }
+      else
+        {
+        fprintf(stderr, "Unrecognized option \"%s\"\n", arg);
+        register_show_usage(stderr, argv[0]);
+        exit(1);
+        }
+      }
+    }
+
+  return 1;
+}
+
+int main(int argc, char *argv[])
+{
+  register_options options;
+  register_initialize_options(&options);
+  register_read_options(argc, argv, &options);
+
+  // -------------------------------------------------------
+  // the files
+  std::vector<TransformArg> *xfminputs = &options.transforms;
+  const char *xfmfile = options.outxfm;
+  const char *imagefile = options.output;
+  const char *sourcefile = options.source;
+  const char *targetfile = options.target;
+  bool display = (options.display != 0 ||
+                  options.screenshot != 0);
+
+  if (!sourcefile || !targetfile)
+    {
+    register_show_usage(stderr, argv[0]);
+    return 1;
+    }
+
+  // -------------------------------------------------------
+  // parameters for registration
+
+  int interpolatorType = options.interpolator;
+  double transformTolerance = 0.1; // tolerance on transformation result
+  int numberOfBins = 64; // for Mattes' mutual information
+  double initialBlurFactor = 8.0;
+
+  // -------------------------------------------------------
+  // parameters for parallel processing
+  if (options.parallel == ThreadPool)
+    {
+#ifdef USE_SMP_THREADED_IMAGE_ALGORITHM
+    vtkThreadedImageAlgorithm::SetGlobalDefaultEnableSMP(true);
+#else
+    cerr << "Warning: ThreadPool not available, ";
+    cerr << "no backend was configured at build time.\n";
+#endif
+    }
+  else if (options.parallel == MultiThread)
+    {
+#ifdef USE_SMP_THREADED_IMAGE_ALGORITHM
+    vtkThreadedImageAlgorithm::SetGlobalDefaultEnableSMP(false);
+#endif
+    }
+  else
+    {
+#ifdef USE_SMP_THREADED_IMAGE_ALGORITHM
+    vtkThreadedImageAlgorithm::SetGlobalDefaultEnableSMP(false);
+#endif
+    vtkMultiThreader::SetGlobalMaximumNumberOfThreads(1);
+    vtkMultiThreader::SetGlobalDefaultNumberOfThreads(1);
+    }
+
+  // -------------------------------------------------------
+  // load and concatenate the initial matrix transforms
+  vtkSmartPointer<vtkMatrix4x4> initialMatrix =
+    vtkSmartPointer<vtkMatrix4x4>::New();
+  vtkSmartPointer<vtkMatrix4x4> tempMatrix =
+    vtkSmartPointer<vtkMatrix4x4>::New();
+  for (size_t ti = 0; ti < xfminputs->size(); ti++)
+    {
+    TransformArg trans = xfminputs->at(ti);
+    if (!options.silent)
+      {
