@@ -2101,3 +2101,618 @@ int main(int argc, char *argv[])
     TransformArg trans = xfminputs->at(ti);
     if (!options.silent)
       {
+      cout << "Reading initial transform: " << trans.filename << endl;
+      if (trans.invert)
+        {
+        cout << "Using inverse of transform." << endl;
+        }
+      }
+
+    ReadMatrix(tempMatrix, trans.filename);
+    if (trans.invert)
+      {
+      tempMatrix->Invert();
+      }
+
+    vtkMatrix4x4::Multiply4x4(tempMatrix, initialMatrix, initialMatrix);
+    }
+
+  // -------------------------------------------------------
+  // load the images
+
+  if (options.coords == NativeCoords)
+    {
+    int ic = CoordSystem(sourcefile);
+    int oc = CoordSystem(targetfile);
+
+    if (ic == DICOMCoords || oc == DICOMCoords)
+      {
+      options.coords = DICOMCoords;
+      }
+    else
+      {
+      options.coords = NIFTICoords;
+      }
+    }
+
+  if (!options.silent)
+    {
+    cout << "Reading source image: " << sourcefile << endl;
+    }
+
+  double sourceRange[2] = { 0.0, 1.0 };
+  vtkSmartPointer<vtkImageData> sourceImage =
+    vtkSmartPointer<vtkImageData>::New();
+  vtkSmartPointer<vtkMatrix4x4> sourceMatrix =
+    vtkSmartPointer<vtkMatrix4x4>::New();
+  vtkSmartPointer<vtkImageReader2> sourceReader =
+    ReadImage(sourceImage, sourceMatrix, sourceRange,
+              sourcefile, options.coords, options.interpolator);
+  sourceReader->Delete();
+
+  if (!options.silent)
+    {
+    cout << "Reading target image: " << targetfile << endl;
+    }
+
+  double targetRange[2] = { 0.0, 1.0 };
+  vtkSmartPointer<vtkImageData> targetImage =
+    vtkSmartPointer<vtkImageData>::New();
+  vtkSmartPointer<vtkMatrix4x4> targetMatrix =
+    vtkSmartPointer<vtkMatrix4x4>::New();
+  vtkSmartPointer<vtkImageReader2> targetReader =
+    ReadImage(targetImage, targetMatrix, targetRange,
+              targetfile, options.coords, options.interpolator);
+  targetReader->Delete();
+
+  if (!options.silent)
+    {
+    if (options.coords == DICOMCoords)
+      {
+      cout << "Using DICOM patient coords." << endl;;
+      }
+    else
+      {
+      cout << "Using NIFTI (or MINC) world coords." << endl;
+      }
+    }
+
+  // -------------------------------------------------------
+  // save the original source matrix
+  vtkSmartPointer<vtkMatrix4x4> originalSourceMatrix =
+    vtkSmartPointer<vtkMatrix4x4>::New();
+  originalSourceMatrix->DeepCopy(sourceMatrix);
+
+  // save the original target matrix
+  vtkSmartPointer<vtkMatrix4x4> originalTargetMatrix =
+    vtkSmartPointer<vtkMatrix4x4>::New();
+  originalTargetMatrix->DeepCopy(targetMatrix);
+
+  // apply the initialization matrix
+  vtkSmartPointer<vtkMatrix4x4> matrix =
+    vtkSmartPointer<vtkMatrix4x4>::New();
+  matrix->DeepCopy(initialMatrix);
+  matrix->Invert();
+  vtkMatrix4x4::Multiply4x4(matrix, targetMatrix, targetMatrix);
+
+  // -------------------------------------------------------
+  // display the images
+
+  vtkSmartPointer<vtkRenderWindow> renderWindow =
+    vtkSmartPointer<vtkRenderWindow>::New();
+  vtkSmartPointer<vtkRenderer> renderer =
+    vtkSmartPointer<vtkRenderer>::New();
+  vtkSmartPointer<vtkRenderWindowInteractor> interactor =
+    vtkSmartPointer<vtkRenderWindowInteractor>::New();
+  vtkSmartPointer<vtkInteractorStyleImage> istyle =
+    vtkSmartPointer<vtkInteractorStyleImage>::New();
+
+  istyle->SetInteractionModeToImageSlicing();
+  interactor->SetInteractorStyle(istyle);
+  renderWindow->SetInteractor(interactor);
+  renderWindow->AddRenderer(renderer);
+
+  vtkSmartPointer<vtkImageSlice> sourceActor =
+    vtkSmartPointer<vtkImageSlice>::New();
+  vtkSmartPointer<vtkImageResliceMapper> sourceMapper =
+    vtkSmartPointer<vtkImageResliceMapper>::New();
+  vtkSmartPointer<vtkImageProperty> sourceProperty =
+    vtkSmartPointer<vtkImageProperty>::New();
+
+  sourceMapper->SET_INPUT_DATA(sourceImage);
+  sourceMapper->SliceAtFocalPointOn();
+  sourceMapper->SliceFacesCameraOn();
+  sourceMapper->ResampleToScreenPixelsOff();
+
+  sourceProperty->SetColorWindow((sourceRange[1]-sourceRange[0]));
+  sourceProperty->SetColorLevel(0.5*(sourceRange[0]+sourceRange[1]));
+  if (options.translucent)
+    {
+    sourceProperty->SetOpacity(0.5);
+    }
+  else
+    {
+    sourceProperty->CheckerboardOn();
+    }
+
+  sourceActor->SetMapper(sourceMapper);
+  sourceActor->SetProperty(sourceProperty);
+  sourceActor->SetUserMatrix(sourceMatrix);
+
+  vtkSmartPointer<vtkImageSlice> targetActor =
+    vtkSmartPointer<vtkImageSlice>::New();
+  vtkSmartPointer<vtkImageResliceMapper> targetMapper =
+    vtkSmartPointer<vtkImageResliceMapper>::New();
+  vtkSmartPointer<vtkImageProperty> targetProperty =
+    vtkSmartPointer<vtkImageProperty>::New();
+
+  targetMapper->SET_INPUT_DATA(targetImage);
+  targetMapper->SliceAtFocalPointOn();
+  targetMapper->SliceFacesCameraOn();
+  targetMapper->ResampleToScreenPixelsOff();
+#ifdef VTK_HAS_SLAB_SPACING
+  if (options.mip)
+    {
+    targetMapper->SetSlabTypeToMax();
+    targetMapper->SetSlabSampleFactor(2);
+    targetMapper->SetSlabThickness(sourceImage->GetSpacing()[2]);
+    }
+#endif
+
+  targetProperty->SetColorWindow((targetRange[1]-targetRange[0]));
+  targetProperty->SetColorLevel(0.5*(targetRange[0]+targetRange[1]));
+
+  targetActor->SetMapper(targetMapper);
+  targetActor->SetProperty(targetProperty);
+  targetActor->SetUserMatrix(targetMatrix);
+
+  vtkSmartPointer<vtkImageStack> imageStack =
+    vtkSmartPointer<vtkImageStack>::New();
+  imageStack->AddImage(targetActor);
+  imageStack->AddImage(sourceActor);
+
+  renderer->AddViewProp(imageStack);
+  renderer->SetBackground(0,0,0);
+
+  renderWindow->SetSize(512,512);
+
+  if (interpolatorType == vtkImageRegistration::Nearest ||
+      interpolatorType == vtkImageRegistration::Label)
+    {
+    targetProperty->SetInterpolationTypeToNearest();
+    sourceProperty->SetInterpolationTypeToNearest();
+    }
+
+  // this variable says which image to move around
+  bool showTargetMoving = (options.source_to_target == 0);
+
+  vtkMatrix4x4 *cameraMatrix = originalTargetMatrix;
+  vtkImageData *cameraImage = targetImage;
+  if (showTargetMoving)
+    {
+    cameraMatrix = originalSourceMatrix;
+    cameraImage = sourceImage;
+    }
+
+  double bounds[6], center[4], tspacing[3];
+  int extent[6];
+  cameraImage->GetBounds(bounds);
+  cameraImage->GetExtent(extent);
+  cameraImage->GetSpacing(tspacing);
+  center[0] = 0.5*(bounds[0] + bounds[1]);
+  center[1] = 0.5*(bounds[2] + bounds[3]);
+  center[2] = 0.5*(bounds[4] + bounds[5]);
+  center[3] = 1.0;
+  cameraMatrix->MultiplyPoint(center, center);
+
+  vtkCamera *camera = renderer->GetActiveCamera();
+  renderer->ResetCamera();
+  camera->SetFocalPoint(center);
+  camera->ParallelProjectionOn();
+  camera->SetParallelScale(0.5*(bounds[3] - bounds[2]));
+  SetViewFromMatrix(renderer, istyle, cameraMatrix, options.coords);
+  renderer->ResetCameraClippingRange();
+
+  double checkSpacing = (extent[3] - extent[2] + 7)/7*tspacing[1];
+  sourceProperty->SetCheckerboardSpacing(checkSpacing, checkSpacing);
+
+  if (display)
+    {
+    renderWindow->Render();
+    }
+
+  // -------------------------------------------------------
+  // prepare for registration
+
+  // get information about the images
+  double targetSpacing[3], sourceSpacing[3];
+  targetImage->GetSpacing(targetSpacing);
+  sourceImage->GetSpacing(sourceSpacing);
+
+  for (int jj = 0; jj < 3; jj++)
+    {
+    targetSpacing[jj] = fabs(targetSpacing[jj]);
+    sourceSpacing[jj] = fabs(sourceSpacing[jj]);
+    }
+
+  double minSpacing = sourceSpacing[0];
+  if (minSpacing > sourceSpacing[1])
+    {
+    minSpacing = sourceSpacing[1];
+    }
+  if (minSpacing > sourceSpacing[2])
+    {
+    minSpacing = sourceSpacing[2];
+    }
+
+  // blur source image with Blackman-windowed sinc
+  vtkSmartPointer<vtkImageSincInterpolator> sourceBlurKernel =
+    vtkSmartPointer<vtkImageSincInterpolator>::New();
+  sourceBlurKernel->SetWindowFunctionToBlackman();
+  sourceBlurKernel->AntialiasingOn();
+
+  // reduce the source resolution
+  vtkSmartPointer<vtkImageResize> sourceBlur =
+    vtkSmartPointer<vtkImageResize>::New();
+  sourceBlur->SET_INPUT_DATA(sourceImage);
+  sourceBlur->SetResizeMethodToOutputSpacing();
+  sourceBlur->SetInterpolator(sourceBlurKernel);
+  sourceBlur->SetInterpolate(
+    interpolatorType != vtkImageRegistration::Nearest);
+
+  // blur target with Blackman-windowed sinc
+  vtkSmartPointer<vtkImageSincInterpolator> targetBlurKernel =
+    vtkSmartPointer<vtkImageSincInterpolator>::New();
+  targetBlurKernel->SetWindowFunctionToBlackman();
+  targetBlurKernel->AntialiasingOn();
+
+  // keep target at full resolution
+  vtkSmartPointer<vtkImageResize> targetBlur =
+    vtkSmartPointer<vtkImageResize>::New();
+  targetBlur->SET_INPUT_DATA(targetImage);
+  targetBlur->SetResizeMethodToOutputSpacing();
+  targetBlur->SetInterpolator(targetBlurKernel);
+  targetBlur->SetInterpolate(
+    interpolatorType != vtkImageRegistration::Nearest);
+
+  // get the initial transformation
+  matrix->DeepCopy(targetMatrix);
+  matrix->Invert();
+  vtkMatrix4x4::Multiply4x4(matrix, sourceMatrix, matrix);
+
+  // set up the registration
+  vtkSmartPointer<vtkImageRegistration> registration =
+    vtkSmartPointer<vtkImageRegistration>::New();
+  registration->SetTargetImageInputConnection(targetBlur->GetOutputPort());
+  registration->SetSourceImageInputConnection(sourceBlur->GetOutputPort());
+  registration->SetSourceImageRange(sourceRange);
+  registration->SetTargetImageRange(targetRange);
+  registration->SetTransformDimensionality(options.dimensionality);
+  registration->SetTransformType(options.transform);
+  registration->SetMetricType(options.metric);
+  registration->SetInterpolatorType(interpolatorType);
+  registration->SetOptimizerType(options.optimizer);
+  registration->SetJointHistogramSize(numberOfBins,numberOfBins);
+  registration->SetCostTolerance(1e-4);
+  registration->SetTransformTolerance(transformTolerance);
+  if (xfminputs->size() > 0)
+    {
+    registration->SetInitializerTypeToNone();
+    }
+  else
+    {
+    registration->SetInitializerTypeToCentered();
+    }
+  registration->Initialize(matrix);
+
+  // -------------------------------------------------------
+  // collect the values as it converges
+  if (options.report)
+    {
+    registration->CollectValuesOn();
+    }
+
+  // -------------------------------------------------------
+  // make a timer
+  vtkSmartPointer<vtkTimerLog> timer =
+    vtkSmartPointer<vtkTimerLog>::New();
+  double startTime = timer->GetUniversalTime();
+  double lastTime = startTime;
+
+  // -------------------------------------------------------
+  // do the registration
+
+  // the registration starts at low-resolution
+  double blurFactor = initialBlurFactor;
+  int level = 0;
+  // will be set to "true" when registration is initialized
+  bool initialized = false;
+
+  while (level < 4 && options.maxeval[level] > 0)
+    {
+    registration->SetMaximumNumberOfEvaluations(options.maxeval[level]);
+    registration->SetMaximumNumberOfIterations(options.maxeval[level]);
+    registration->SetInterpolatorType(interpolatorType);
+    registration->SetTransformTolerance(transformTolerance*blurFactor);
+
+    if (blurFactor < 1.1)
+      {
+      // full resolution: no blurring or resampling
+      sourceBlur->SetInterpolator(0);
+      sourceBlur->InterpolateOff();
+      sourceBlur->SetOutputSpacing(sourceSpacing);
+#if VTK_MAJOR_VERSION >= 6
+      sourceBlur->UpdateWholeExtent();
+#else
+      sourceBlur->GetOutput()->SetUpdateExtentToWholeExtent();
+      sourceBlur->Update();
+#endif
+
+      targetBlur->SetInterpolator(0);
+      sourceBlur->InterpolateOff();
+      targetBlur->SetOutputSpacing(targetSpacing);
+#if VTK_MAJOR_VERSION >= 6
+      targetBlur->UpdateWholeExtent();
+#else
+      targetBlur->GetOutput()->SetUpdateExtentToWholeExtent();
+      targetBlur->Update();
+#endif
+      }
+    else
+      {
+      // reduced resolution: set the blurring
+      double spacing[3];
+      for (int j = 0; j < 3; j++)
+        {
+        spacing[j] = blurFactor*minSpacing;
+        if (spacing[j] < sourceSpacing[j])
+          {
+          spacing[j] = sourceSpacing[j];
+          }
+        }
+
+      sourceBlurKernel->SetBlurFactors(
+        spacing[0]/sourceSpacing[0],
+        spacing[1]/sourceSpacing[1],
+        spacing[2]/sourceSpacing[2]);
+
+      sourceBlur->SetOutputSpacing(spacing);
+#if VTK_MAJOR_VERSION >= 6
+      sourceBlur->UpdateWholeExtent();
+#else
+      sourceBlur->GetOutput()->SetUpdateExtentToWholeExtent();
+      sourceBlur->Update();
+#endif
+
+      targetBlurKernel->SetBlurFactors(
+        blurFactor*minSpacing/targetSpacing[0],
+        blurFactor*minSpacing/targetSpacing[1],
+        blurFactor*minSpacing/targetSpacing[2]);
+
+#if VTK_MAJOR_VERSION >= 6
+      targetBlur->UpdateWholeExtent();
+#else
+      targetBlur->GetOutput()->SetUpdateExtentToWholeExtent();
+      targetBlur->Update();
+#endif
+      }
+
+    if (initialized)
+      {
+      // re-initialize with the matrix from the previous step
+      registration->SetInitializerTypeToNone();
+      matrix->DeepCopy(registration->GetTransform()->GetMatrix());
+      }
+
+    registration->Initialize(matrix);
+
+    initialized = true;
+
+    while (registration->Iterate())
+      {
+      // registration->UpdateRegistration();
+      // will iterate until convergence or failure
+
+      if (showTargetMoving)
+        {
+        targetMatrix->DeepCopy(registration->GetTransform()->GetMatrix());
+        targetMatrix->Invert();
+        vtkMatrix4x4::Multiply4x4(
+          originalSourceMatrix, targetMatrix, targetMatrix);
+        targetMatrix->Modified();
+        }
+      else
+        {
+        sourceMatrix->DeepCopy(registration->GetTransform()->GetMatrix());
+        vtkMatrix4x4::Multiply4x4(
+          originalTargetMatrix, sourceMatrix, sourceMatrix);
+        sourceMatrix->Modified();
+        }
+
+      if (display)
+        {
+        interactor->Render();
+        }
+      }
+
+    double newTime = timer->GetUniversalTime();
+    double blurSpacing[3];
+    sourceBlur->GetOutputSpacing(blurSpacing);
+    double minBlurSpacing = VTK_DOUBLE_MAX;
+    for (int kk = 0; kk < 3; kk++)
+      {
+      if (blurSpacing[kk] < minBlurSpacing)
+        {
+        minBlurSpacing = blurSpacing[kk];
+        }
+      }
+
+    if (!options.silent)
+      {
+      cout << minBlurSpacing << " mm took "
+           << (newTime - lastTime) << "s and "
+           << registration->GetNumberOfEvaluations() << " evaluations" << endl;
+      lastTime = newTime;
+      }
+
+    // prepare for next iteration
+    level++;
+    blurFactor /= 2.0;
+    }
+
+  if (!options.silent)
+    {
+    cout << "registration took " << (lastTime - startTime) << "s" << endl;
+    }
+
+  // -------------------------------------------------------
+  // write the output matrix
+  if (xfmfile)
+    {
+    if (!options.silent)
+      {
+      cout << "Writing transform file: " << xfmfile << endl;
+      }
+
+    vtkMatrix4x4 *rmatrix = registration->GetTransform()->GetMatrix();
+    vtkSmartPointer<vtkMatrix4x4> wmatrix =
+      vtkSmartPointer<vtkMatrix4x4>::New();
+    wmatrix->DeepCopy(originalSourceMatrix);
+    wmatrix->Invert();
+    vtkMatrix4x4::Multiply4x4(rmatrix, wmatrix, wmatrix);
+    vtkMatrix4x4::Multiply4x4(originalTargetMatrix, wmatrix, wmatrix);
+
+    WriteMatrix(wmatrix, xfmfile, center);
+    }
+
+  // -------------------------------------------------------
+  // capture a screen shot
+  if (options.screenshot)
+    {
+    WriteScreenshot(renderWindow, options.screenshot);
+    }
+
+  // -------------------------------------------------------
+  // write a report
+  if (options.report)
+    {
+    WriteReport(registration, options.report);
+    }
+
+  // -------------------------------------------------------
+  // write the output file
+  if (imagefile)
+    {
+    if (!options.silent)
+      {
+      cout << "Writing transformed image: " << imagefile << endl;
+      }
+
+    // check which image is to be written
+    vtkImageData *resliceImage = targetImage;
+    vtkImageData *templateImage = sourceImage;
+    if (options.source_to_target)
+      {
+      resliceImage = sourceImage;
+      templateImage = targetImage;
+      }
+
+    int outputScalarType = resliceImage->GetScalarType();
+
+    vtkSmartPointer<vtkImageBSplineCoefficients> bspline =
+      vtkSmartPointer<vtkImageBSplineCoefficients>::New();
+    // if bspline, need to filter the image first
+    if (options.interpolator == vtkImageRegistration::BSpline)
+      {
+      bspline->SET_INPUT_DATA(resliceImage);
+      bspline->Update();
+      resliceImage = bspline->GetOutput();
+      }
+
+    vtkSmartPointer<vtkImageReslice> reslice =
+      vtkSmartPointer<vtkImageReslice>::New();
+    reslice->SetInformationInput(templateImage);
+    reslice->SET_INPUT_DATA(resliceImage);
+    SetInterpolator(reslice, options.interpolator);
+
+#ifdef VTK_RESLICE_HAS_OUTPUT_SCALAR_TYPE
+    if (outputScalarType != resliceImage->GetScalarType())
+      {
+      reslice->SetOutputScalarType(outputScalarType);
+      }
+#endif
+
+    if (options.source_to_target)
+      {
+      reslice->SetResliceTransform(
+        registration->GetTransform()->GetInverse());
+      }
+    else
+      {
+      reslice->SetResliceTransform(
+        registration->GetTransform());
+      }
+
+#ifdef VTK_HAS_SLAB_SPACING
+    if (options.mip)
+      {
+      double ss[3];
+      double st[3];
+      templateImage->GetSpacing(ss);
+      resliceImage->GetSpacing(st);
+      int sn = vtkMath::Ceil(ss[2]/st[2])*2 + 1;
+      reslice->SetSlabModeToMax();
+      reslice->SetSlabNumberOfSlices(sn);
+      reslice->SetSlabSliceSpacingFraction(1.0/sn);
+      if (!options.silent)
+        {
+        cout << "Wrote MIP slabs that are " << ss[2] << " mm thick." << endl;
+        }
+      }
+#endif
+
+    reslice->Update();
+    resliceImage = reslice->GetOutput();
+
+#ifndef VTK_RESLICE_HAS_OUTPUT_SCALAR_TYPE
+    vtkSmartPointer<vtkImageCast> imageCast =
+      vtkSmartPointer<vtkImageCast>::New();
+    if (outputScalarType != resliceImage->GetScalarType())
+      {
+      imageCast->SET_INPUT_DATA(resliceImage);
+      imageCast->SetOutputScalarType(outputScalarType);
+      imageCast->ClampOverflowOn();
+      imageCast->Update();
+      resliceImage = imageCast->GetOutput();
+      }
+#endif
+
+    if (options.source_to_target)
+      {
+      WriteImage(targetReader, sourceReader,
+        resliceImage, originalTargetMatrix, imagefile,
+        options.coords, options.interpolator);
+      }
+    else
+      {
+      WriteImage(sourceReader, targetReader,
+        resliceImage, originalSourceMatrix, imagefile,
+        options.coords, options.interpolator);
+      }
+    }
+
+  if (!options.silent)
+    {
+    cout << "Done!" << endl;
+    }
+
+  // -------------------------------------------------------
+  // allow user to interact
+
+  if (options.display)
+    {
+    interactor->Start();
+    }
+
+  return 0;
+}
