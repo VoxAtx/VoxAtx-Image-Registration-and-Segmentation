@@ -177,4 +177,51 @@ vtkDICOMReader *ReadDICOMImage(
 
   // when reading images, only read 1st component if the
   // image has multiple components or multiple time points
-  vtkIn
+  vtkIntArray *fileArray = reader->GetFileIndexArray();
+
+  // create a filtered list of files
+  vtkSmartPointer<vtkStringArray> fileNames =
+    vtkSmartPointer<vtkStringArray>::New();
+  vtkIdType n = fileArray->GetNumberOfTuples();
+  for (vtkIdType i = 0; i < n; i++)
+    {
+    fileNames->InsertNextValue(
+      reader->GetFileNames()->GetValue(fileArray->GetComponent(i, 0)));
+    }
+  reader->SetDesiredTimeIndex(0);
+  reader->SetFileNames(fileNames);
+
+  reader->Update();
+  if (reader->GetErrorCode())
+    {
+    exit(1);
+    }
+
+  vtkImageData *image = reader->GetOutput();
+
+  // get the data
+  data->CopyStructure(image);
+  data->GetPointData()->PassData(image->GetPointData());
+
+  // get the matrix
+  matrix->DeepCopy(reader->GetPatientMatrix());
+
+  return reader;
+}
+
+void WriteDICOMImage(
+  vtkImageReader2 *sourceReader, vtkImageReader2 *targetReader,
+  vtkImageData *data, vtkMatrix4x4 *matrix, const char *directoryName,
+  int vtkNotUsed(coordSystem))
+{
+  if (vtksys::SystemTools::FileExists(directoryName))
+    {
+    if (!vtksys::SystemTools::FileIsDirectory(directoryName))
+      {
+      fprintf(stderr, "option -o must give a DICOM directory, not a file.\n");
+      exit(1);
+      }
+    }
+  else if (!vtksys::SystemTools::MakeDirectory(directoryName))
+    {
+    fprintf(stderr, "Cannot create directory: %s\n", direc
