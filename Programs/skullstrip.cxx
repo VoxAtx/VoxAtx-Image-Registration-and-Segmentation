@@ -127,4 +127,54 @@ int GuessFileType(const char *filename)
 
 #ifdef AIRS_USE_DICOM
 vtkDICOMReader *ReadDICOMImage(
-  vtkImageData *data, 
+  vtkImageData *data, vtkMatrix4x4 *matrix, const char *directoryName,
+  int coordSystem)
+{
+  // get the files
+  std::string dirString = directoryName;
+  vtksys::SystemTools::ConvertToUnixSlashes(dirString);
+  vtkSmartPointer<vtkGlobFileNames> glob =
+    vtkSmartPointer<vtkGlobFileNames>::New();
+  glob->SetDirectory(dirString.c_str());
+  glob->AddFileNames("*");
+
+  // sort the files
+  vtkSmartPointer<vtkDICOMSorter> sorter =
+    vtkSmartPointer<vtkDICOMSorter>::New();
+  sorter->SetInputFileNames(glob->GetFileNames());
+  sorter->Update();
+
+  if (sorter->GetNumberOfSeries() == 0)
+    {
+    fprintf(stderr, "Folder contains no DICOM files: %s\n", directoryName);
+    exit(1);
+    }
+  else if (sorter->GetNumberOfSeries() > 1)
+    {
+    fprintf(stderr, "Folder contains more than one DICOM series: %s\n",
+            directoryName);
+    exit(1);
+    }
+
+  // read the image
+  vtkDICOMReader *reader = vtkDICOMReader::New();
+  reader->SetFileNames(sorter->GetFileNamesForSeries(0));
+
+  if (coordSystem == NIFTICoords)
+    {
+    reader->SetMemoryRowOrderToBottomUp();
+    }
+  else
+    {
+    reader->SetMemoryRowOrderToFileNative();
+    }
+
+  reader->UpdateInformation();
+  if (reader->GetErrorCode())
+    {
+    exit(1);
+    }
+
+  // when reading images, only read 1st component if the
+  // image has multiple components or multiple time points
+  vtkIn
