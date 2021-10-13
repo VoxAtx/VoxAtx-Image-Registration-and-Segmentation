@@ -224,4 +224,44 @@ void WriteDICOMImage(
     }
   else if (!vtksys::SystemTools::MakeDirectory(directoryName))
     {
-    fprintf(stderr, "Cannot create directory: %s\n", direc
+    fprintf(stderr, "Cannot create directory: %s\n", directoryName);
+    exit(1);
+    }
+
+  // get the meta data
+  vtkDICOMReader *reader = vtkDICOMReader::SafeDownCast(targetReader);
+  vtkDICOMReader *reader2 = vtkDICOMReader::SafeDownCast(sourceReader);
+
+  vtkSmartPointer<vtkDICOMMetaData> meta =
+    vtkSmartPointer<vtkDICOMMetaData>::New();
+
+  if (reader)
+    {
+    // copy the bulk of the meta data from the target image
+    meta->DeepCopy(reader->GetMetaData());
+    meta->SetAttributeValue(DC::SeriesNumber,
+      meta->GetAttributeValue(DC::SeriesNumber).AsUnsignedInt() + 1000);
+    std::string seriesDescription =
+      meta->GetAttributeValue(DC::SeriesDescription).AsString() + " SEG";
+    if (seriesDescription.size() < 64)
+      {
+      meta->SetAttributeValue(DC::SeriesDescription, seriesDescription);
+      }
+    }
+  if (reader2)
+    {
+    // set the frame of reference from the source image
+    meta->SetAttributeValue(DC::FrameOfReferenceUID,
+      reader2->GetMetaData()->GetAttributeValue(
+      DC::FrameOfReferenceUID));
+    }
+
+  // make the generator
+  vtkSmartPointer<vtkDICOMMRGenerator> mrgenerator =
+    vtkSmartPointer<vtkDICOMMRGenerator>::New();
+  vtkSmartPointer<vtkDICOMCTGenerator> ctgenerator =
+    vtkSmartPointer<vtkDICOMCTGenerator>::New();
+  vtkDICOMGenerator *generator = 0;
+  if (reader)
+    {
+    std::string SOPClass
