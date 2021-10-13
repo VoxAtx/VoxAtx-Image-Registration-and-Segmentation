@@ -75,4 +75,56 @@ Module:    skullstrip.cxx
 
 #include <stdlib.h>
 
-// A macro 
+// A macro to assist VTK 5 backwards compatibility
+#if VTK_MAJOR_VERSION >= 6
+#define SET_INPUT_DATA SetInputData
+#define SET_STENCIL_DATA SetStencilData
+#else
+#define SET_INPUT_DATA SetInput
+#define SET_STENCIL_DATA SetStencil
+#endif
+
+// coord systems
+enum { NativeCoords, DICOMCoords, NIFTICoords };
+
+// file types
+enum { DICOMImage, NIFTIImage, MINCImage, LastImageType = MINCImage,
+       STLSurface, OBJSurface, VTKSurface, LastSurfaceType = VTKSurface };
+
+// internal methods for reading images, these methods read the image
+// into the specified data object and also provide a matrix for converting
+// the data coordinates into patient coordinates.
+namespace {
+
+int GuessFileType(const char *filename)
+{
+  size_t n = strlen(filename);
+
+  if (n > 4 && strcmp(&filename[n-4], ".mnc") == 0)
+    {
+    return MINCImage;
+    }
+  if ((n > 4 && strcmp(&filename[n-4], ".nii") == 0) ||
+      (n > 7 && strcmp(&filename[n-7], ".nii.gz") == 0))
+    {
+    return NIFTIImage;
+    }
+  if (n > 4 && strcmp(&filename[n-4], ".stl") == 0)
+    {
+    return STLSurface;
+    }
+  if (n > 4 && strcmp(&filename[n-4], ".obj") == 0)
+    {
+    return OBJSurface;
+    }
+  if (n > 4 && strcmp(&filename[n-4], ".vtk") == 0)
+    {
+    return VTKSurface;
+    }
+
+  return DICOMImage;
+}
+
+#ifdef AIRS_USE_DICOM
+vtkDICOMReader *ReadDICOMImage(
+  vtkImageData *data, 
