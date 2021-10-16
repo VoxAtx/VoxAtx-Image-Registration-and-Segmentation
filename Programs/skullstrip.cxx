@@ -264,4 +264,51 @@ void WriteDICOMImage(
   vtkDICOMGenerator *generator = 0;
   if (reader)
     {
-    std::string SOPClass
+    std::string SOPClass =
+      meta->GetAttributeValue(DC::SOPClassUID).AsString();
+    if (SOPClass == "1.2.840.10008.5.1.4.1.1.2")
+      {
+      generator = ctgenerator;
+      }
+    else if (SOPClass == "1.2.840.10008.5.1.4.1.1.4")
+      {
+      generator = mrgenerator;
+      }
+    }
+
+  // prepare the writer to write the image
+  vtkSmartPointer<vtkDICOMWriter> writer =
+    vtkSmartPointer<vtkDICOMWriter>::New();
+  if (generator)
+    {
+    writer->SetGenerator(generator);
+    }
+  writer->SetMetaData(meta);
+  writer->SetFilePrefix(directoryName);
+  writer->SetFilePattern("%s/IM-0001-%04.4d.dcm");
+  writer->TimeAsVectorOn();
+  if (reader)
+    {
+    if (reader->GetTimeDimension() > 1)
+      {
+      writer->SetTimeDimension(reader->GetTimeDimension());
+      writer->SetTimeSpacing(reader->GetTimeSpacing());
+      }
+    if (reader->GetRescaleSlope() > 0)
+      {
+      writer->SetRescaleSlope(reader->GetRescaleSlope());
+      writer->SetRescaleIntercept(reader->GetRescaleIntercept());
+      }
+    writer->SetMemoryRowOrder(reader->GetMemoryRowOrder());
+    }
+  writer->SET_INPUT_DATA(data);
+  writer->SetPatientMatrix(matrix);
+  writer->Write();
+}
+
+#else
+
+vtkDICOMImageReader *ReadDICOMImage(
+  vtkImageData *data, vtkMatrix4x4 *matrix, const char *directoryName,
+  int coordSystem)
+{
