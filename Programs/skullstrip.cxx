@@ -312,3 +312,51 @@ vtkDICOMImageReader *ReadDICOMImage(
   vtkImageData *data, vtkMatrix4x4 *matrix, const char *directoryName,
   int coordSystem)
 {
+  // read the image
+  vtkDICOMImageReader *reader = vtkDICOMImageReader::New();
+
+  reader->SetDirectoryName(directoryName);
+  reader->Update();
+  if (reader->GetErrorCode())
+    {
+    exit(1);
+    }
+
+  vtkSmartPointer<vtkImageData> image = reader->GetOutput();
+
+  if (coordSystem != NIFTICoords)
+    {
+    // the reader flips the image and reverses the ordering, so undo these
+    vtkSmartPointer<vtkImageReslice> flip =
+      vtkSmartPointer<vtkImageReslice>::New();
+
+    flip->SetInputConnection(reader->GetOutputPort());
+    flip->SetResliceAxesDirectionCosines(
+      1,0,0, 0,-1,0, 0,0,-1);
+    flip->Update();
+
+    image = flip->GetOutput();
+    }
+
+  // get the data
+  data->CopyStructure(image);
+  data->GetPointData()->PassData(image->GetPointData());
+  data->SetOrigin(0,0,0);
+
+  // generate the matrix
+  float *position = reader->GetImagePositionPatient();
+  float *orientation = reader->GetImageOrientationPatient();
+  float *xdir = &orientation[0];
+  float *ydir = &orientation[3];
+  float zdir[3];
+  vtkMath::Cross(xdir, ydir, zdir);
+
+  for (int i = 0; i < 3; i++)
+    {
+    matrix->Element[i][0] = xdir[i];
+    matrix->Element[i][1] = ydir[i];
+    matrix->Element[i][2] = zdir[i];
+    matrix->Element[i][3] = position[i];
+    }
+  matrix->Element[3][0] = 0;
+  
