@@ -411,4 +411,45 @@ vtkMINCImageReader *ReadMINCImage(
     exit(1);
     }
 
-  vtkSmartPointer<vtkImageData> image = reader->
+  vtkSmartPointer<vtkImageData> image = reader->GetOutput();
+
+  if (coordSystem == DICOMCoords)
+    {
+    double spacing[3];
+    reader->GetOutput()->GetSpacing(spacing);
+    spacing[0] = fabs(spacing[0]);
+    spacing[1] = fabs(spacing[1]);
+    spacing[2] = fabs(spacing[2]);
+
+    // flip the image rows into a DICOM-style ordering
+    vtkSmartPointer<vtkImageReslice> flip =
+      vtkSmartPointer<vtkImageReslice>::New();
+
+    flip->SetInputConnection(reader->GetOutputPort());
+    flip->SetResliceAxesDirectionCosines(
+      -1,0,0, 0,-1,0, 0,0,1);
+    flip->SetOutputSpacing(spacing);
+    flip->Update();
+
+    image = flip->GetOutput();
+    }
+
+  // get the data
+  data->CopyStructure(image);
+  data->GetPointData()->PassData(image->GetPointData());
+
+  if (coordSystem == DICOMCoords)
+    {
+    // generate the matrix, but modify to use DICOM coords
+    static double xyFlipMatrix[16] =
+      { -1, 0, 0, 0,  0, -1, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1 };
+    // correct for the flip that was done earlier
+    vtkMatrix4x4::Multiply4x4(*reader->GetDirectionCosines()->Element,
+                              xyFlipMatrix, *matrix->Element);
+    // do the left/right, up/down dicom-to-minc transformation
+    vtkMatrix4x4::Multiply4x4(xyFlipMatrix, *matrix->Element, *matrix->Element);
+    matrix->Modified();
+    }
+  else
+    {
+    matrix->
