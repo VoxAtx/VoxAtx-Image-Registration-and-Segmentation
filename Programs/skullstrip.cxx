@@ -359,4 +359,56 @@ vtkDICOMImageReader *ReadDICOMImage(
     matrix->Element[i][3] = position[i];
     }
   matrix->Element[3][0] = 0;
-  
+  matrix->Element[3][1] = 0;
+  matrix->Element[3][2] = 0;
+  matrix->Element[3][3] = 1;
+
+  if (coordSystem == NIFTICoords)
+    {
+    double spacing[3], origin[3];
+    int extent[6];
+    image->GetSpacing(spacing);
+    image->GetOrigin(origin);
+    image->GetExtent(extent);
+    // account fo the y and z flips
+    double point[4];
+    point[0] = origin[0] + spacing[0]*extent[0];
+    point[1] = origin[1] + spacing[1]*extent[3];
+    point[2] = origin[2] + spacing[2]*extent[5];
+    point[3] = 1.0;
+    matrix->MultiplyPoint(point, point);
+    for (int j = 0; j < 3; j++)
+      {
+      matrix->Element[j][1] = -matrix->Element[j][1];
+      matrix->Element[j][2] = -matrix->Element[j][2];
+      matrix->Element[j][3] = point[j];
+      }
+    // do the DICOM to NIFTI coord conversion
+    for (int k = 0; k < 4; k++)
+      {
+      matrix->Element[0][k] = -matrix->Element[0][k];
+      matrix->Element[1][k] = -matrix->Element[1][k];
+      }
+    }
+
+  matrix->Modified();
+
+  return reader;
+}
+#endif
+
+vtkMINCImageReader *ReadMINCImage(
+  vtkImageData *data, vtkMatrix4x4 *matrix, const char *fileName,
+  int coordSystem)
+{
+  // read the image
+  vtkMINCImageReader *reader = vtkMINCImageReader::New();
+
+  reader->SetFileName(fileName);
+  reader->Update();
+  if (reader->GetErrorCode())
+    {
+    exit(1);
+    }
+
+  vtkSmartPointer<vtkImageData> image = reader->
