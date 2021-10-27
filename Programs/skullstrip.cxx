@@ -452,4 +452,52 @@ vtkMINCImageReader *ReadMINCImage(
     }
   else
     {
-    matrix->
+    matrix->DeepCopy(reader->GetDirectionCosines());
+    }
+
+  return reader;
+}
+
+void WriteMINCImage(
+  vtkImageReader2 *vtkNotUsed(sourceReader),
+  vtkImageReader2 *vtkNotUsed(targetReader),
+  vtkImageData *data, vtkMatrix4x4 *vtkNotUsed(matrix), const char *fileName,
+  int vtkNotUsed(coordSystem))
+{
+  fprintf(stderr, "Writing MINC images is not supported yet, "
+          "the output file will have incorrect information\n");
+  vtkSmartPointer<vtkMINCImageWriter> writer =
+    vtkSmartPointer<vtkMINCImageWriter>::New();
+  writer->SetFileName(fileName);
+  writer->SET_INPUT_DATA(data);
+  // the input matrix must be converted
+  //writer->SetDirectionCosines(matrix);
+  writer->Write();
+}
+
+#ifdef AIRS_USE_NIFTI
+vtkNIFTIReader *ReadNIFTIImage(
+  vtkImageData *data, vtkMatrix4x4 *matrix, const char *fileName,
+  int coordSystem)
+{
+  // read the image
+  vtkNIFTIReader *reader = vtkNIFTIReader::New();
+
+  reader->SetFileName(fileName);
+  reader->Update();
+  if (reader->GetErrorCode())
+    {
+    exit(1);
+    }
+
+  vtkSmartPointer<vtkImageData> image = reader->GetOutput();
+
+  if (coordSystem == DICOMCoords)
+    {
+    double spacing[3];
+    reader->GetOutput()->GetSpacing(spacing);
+    spacing[0] = fabs(spacing[0]);
+    spacing[1] = fabs(spacing[1]);
+    spacing[2] = fabs(spacing[2]);
+
+    // flip the image rows into a DICOM-style 
