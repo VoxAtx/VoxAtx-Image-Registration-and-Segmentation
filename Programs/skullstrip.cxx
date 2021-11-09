@@ -542,4 +542,56 @@ vtkNIFTIReader *ReadNIFTIImage(
     }
   else
     {
-    matrix-
+    matrix->DeepCopy(nMatrix);
+    }
+
+  return reader;
+}
+
+void WriteNIFTIImage(
+  vtkImageReader2 *vtkNotUsed(sourceReader), vtkImageReader2 *targetReader,
+  vtkImageData *data, vtkMatrix4x4 *matrix, const char *fileName,
+  int vtkNotUsed(coordSystem))
+{
+  vtkNIFTIReader *reader = vtkNIFTIReader::SafeDownCast(targetReader);
+
+  vtkSmartPointer<vtkNIFTIWriter> writer =
+    vtkSmartPointer<vtkNIFTIWriter>::New();
+  if (reader)
+    {
+    writer->SetNIFTIHeader(reader->GetNIFTIHeader());
+    if (reader->GetTimeDimension() > 1)
+      {
+      writer->SetTimeDimension(reader->GetTimeDimension());
+      writer->SetTimeSpacing(reader->GetTimeSpacing());
+      }
+    if (reader->GetQFac() < 0)
+      {
+      writer->SetQFac(-1.0);
+      }
+    }
+  writer->SET_INPUT_DATA(data);
+  writer->SetQFormMatrix(matrix);
+  writer->SetSFormMatrix(matrix);
+  writer->SetFileName(fileName);
+  writer->Write();
+}
+
+#endif /* AIRS_USE_NIFTI */
+
+vtkImageReader2 *ReadImage(
+  vtkImageData *image, vtkMatrix4x4 *matrix,
+  const char *filename, int coordSystem)
+{
+  int t = GuessFileType(filename);
+
+  if (t == MINCImage)
+    {
+    return ReadMINCImage(image, matrix, filename, coordSystem);
+    }
+  else if (t == NIFTIImage)
+    {
+#ifdef AIRS_USE_NIFTI
+    return ReadNIFTIImage(image, matrix, filename, coordSystem);
+#else
+    fprintf(stderr, "NIFTI files ar
