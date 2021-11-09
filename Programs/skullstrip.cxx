@@ -594,4 +594,68 @@ vtkImageReader2 *ReadImage(
 #ifdef AIRS_USE_NIFTI
     return ReadNIFTIImage(image, matrix, filename, coordSystem);
 #else
-    fprintf(stderr, "NIFTI files ar
+    fprintf(stderr, "NIFTI files are not supported.\n");
+    exit(1);
+#endif
+    }
+
+  return ReadDICOMImage(image, matrix, filename, coordSystem);
+}
+
+int CoordSystem(const char *filename)
+{
+  int t = GuessFileType(filename);
+
+  if (t == MINCImage || t == NIFTIImage)
+    {
+    return NIFTICoords;
+    }
+
+  return DICOMCoords;
+}
+
+void WriteImage(
+  vtkImageReader2 *sourceReader, vtkImageReader2 *targetReader,
+  vtkImageData *image, vtkMatrix4x4 *matrix,
+  const char *filename, int coordSystem)
+{
+  int t = GuessFileType(filename);
+
+  if (t == MINCImage)
+    {
+    WriteMINCImage(
+      sourceReader, targetReader, image, matrix, filename, coordSystem);
+    }
+  else if (t == NIFTIImage)
+    {
+#ifdef AIRS_USE_NIFTI
+    WriteNIFTIImage(
+      sourceReader, targetReader, image, matrix, filename, coordSystem);
+#else
+    fprintf(stderr, "NIFTI files are not supported.\n");
+    exit(1);
+#endif
+    }
+  else
+    {
+#ifdef AIRS_USE_DICOM
+    WriteDICOMImage(
+      sourceReader, targetReader, image, matrix, filename, coordSystem);
+#else
+    fprintf(stderr, "Writing DICOM files is not supported.\n");
+    exit(1);
+#endif
+    }
+}
+
+
+void WriteMesh(vtkPolyData *mesh, vtkMatrix4x4 *matrix,
+  const char *filename)
+{
+  int t = GuessFileType(filename);
+
+  vtkSmartPointer<vtkTransform> transform =
+    vtkSmartPointer<vtkTransform>::New();
+  if (matrix)
+    {
+    transform->Concatenate(ma
