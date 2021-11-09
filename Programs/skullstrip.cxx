@@ -500,4 +500,46 @@ vtkNIFTIReader *ReadNIFTIImage(
     spacing[1] = fabs(spacing[1]);
     spacing[2] = fabs(spacing[2]);
 
-    // flip the image rows into a DICOM-style 
+    // flip the image rows into a DICOM-style ordering
+    vtkSmartPointer<vtkImageReslice> flip =
+      vtkSmartPointer<vtkImageReslice>::New();
+
+    flip->SetInputConnection(reader->GetOutputPort());
+    flip->SetResliceAxesDirectionCosines(
+      -1,0,0, 0,-1,0, 0,0,1);
+    flip->SetOutputSpacing(spacing);
+    flip->Update();
+
+    image = flip->GetOutput();
+    }
+
+  // get the data
+  data->CopyStructure(image);
+  data->GetPointData()->PassData(image->GetPointData());
+
+  // get the SForm or QForm matrix if present
+  static double nMatrix[16] =
+    { 1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1 };
+  if (reader->GetQFormMatrix())
+    {
+    vtkMatrix4x4::DeepCopy(nMatrix, reader->GetQFormMatrix());
+    }
+  else if (reader->GetSFormMatrix())
+    {
+    vtkMatrix4x4::DeepCopy(nMatrix, reader->GetSFormMatrix());
+    }
+
+  if (coordSystem == DICOMCoords)
+    {
+    // generate the matrix, but modify to use DICOM coords
+    static double xyFlipMatrix[16] =
+      { -1, 0, 0, 0,  0, -1, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1 };
+    // correct for the flip that was done earlier
+    vtkMatrix4x4::Multiply4x4(nMatrix, xyFlipMatrix, *matrix->Element);
+    // do the left/right, up/down dicom-to-minc transformation
+    vtkMatrix4x4::Multiply4x4(xyFlipMatrix, *matrix->Element, *matrix->Element);
+    matrix->Modified();
+    }
+  else
+    {
+    matrix-
