@@ -658,4 +658,49 @@ void WriteMesh(vtkPolyData *mesh, vtkMatrix4x4 *matrix,
     vtkSmartPointer<vtkTransform>::New();
   if (matrix)
     {
-    transform->Concatenate(ma
+    transform->Concatenate(matrix);
+    }
+
+  vtkSmartPointer<vtkTransformPolyDataFilter> filter =
+    vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+  filter->SET_INPUT_DATA(mesh);
+  filter->SetTransform(transform);
+  filter->Update();
+
+  if (t == STLSurface)
+    {
+    vtkSmartPointer<vtkSTLWriter> writer =
+      vtkSmartPointer<vtkSTLWriter>::New();
+    writer->SET_INPUT_DATA(filter->GetOutput());
+    writer->SetFileName(filename);
+    writer->Write();
+    }
+  else if (t == OBJSurface)
+    {
+    vtkSmartPointer<vtkMNIObjectWriter> writer =
+      vtkSmartPointer<vtkMNIObjectWriter>::New();
+    writer->SET_INPUT_DATA(filter->GetOutput());
+    writer->SetFileName(filename);
+    writer->Write();
+    }
+  else if (t == VTKSurface)
+    {
+    vtkSmartPointer<vtkPolyDataWriter> writer =
+      vtkSmartPointer<vtkPolyDataWriter>::New();
+    writer->SET_INPUT_DATA(filter->GetOutput());
+    writer->SetFileName(filename);
+    writer->Write();
+    }
+}
+
+void SetViewFromMatrix(
+  vtkRenderer *renderer,
+  vtkInteractorStyleImage *istyle,
+  vtkMatrix4x4 *matrix,
+  int coordSystem)
+{
+  istyle->SetCurrentRenderer(renderer);
+
+  // This view assumes the data uses the DICOM Patient Coordinate System.
+  // It provides a right-is-left view of axial and coronal images
+  double viewRight[4] = { 1.0, 0.0, 0.0, 0
