@@ -703,4 +703,53 @@ void SetViewFromMatrix(
 
   // This view assumes the data uses the DICOM Patient Coordinate System.
   // It provides a right-is-left view of axial and coronal images
-  double viewRight[4] = { 1.0, 0.0, 0.0, 0
+  double viewRight[4] = { 1.0, 0.0, 0.0, 0.0 };
+  double viewUp[4] = { 0.0, 1.0, 0.0, 0.0 };
+
+  if (coordSystem == DICOMCoords)
+    {
+    viewUp[1] = -1.0;
+    }
+
+  matrix->MultiplyPoint(viewRight, viewRight);
+  matrix->MultiplyPoint(viewUp, viewUp);
+
+  istyle->SetImageOrientation(viewRight, viewUp);
+}
+
+// a class to look for errors when reading transforms.
+class ErrorObserver : public vtkCommand
+{
+public:
+  static ErrorObserver *New() { return new ErrorObserver; }
+  vtkTypeMacro(ErrorObserver, vtkCommand);
+  virtual void Execute(vtkObject *o, unsigned long eventId, void *callData);
+};
+
+void ErrorObserver::Execute(
+  vtkObject *, unsigned long, void *callData)
+{
+  if (callData)
+    {
+    fprintf(stderr, "%s\n", static_cast<char *>(callData));
+    }
+  exit(1);
+}
+
+void WriteScreenshot(vtkWindow *window, const char *filename)
+{
+  vtkSmartPointer<vtkWindowToImageFilter> snap =
+    vtkSmartPointer<vtkWindowToImageFilter>::New();
+  snap->SetInput(window);
+  snap->Update();
+
+  size_t l = strlen(filename);
+  if (l >= 4 && strcmp(filename + (l - 4), ".png") == 0)
+    {
+    vtkSmartPointer<vtkPNGWriter> snapWriter =
+      vtkSmartPointer<vtkPNGWriter>::New();
+    snapWriter->SetInputConnection(snap->GetOutputPort());
+    snapWriter->SetFileName(filename);
+    snapWriter->Write();
+    }
+  else if ((l >= 4 && strcmp(file
