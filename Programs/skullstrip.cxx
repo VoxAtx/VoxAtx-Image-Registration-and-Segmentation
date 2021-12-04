@@ -752,4 +752,44 @@ void WriteScreenshot(vtkWindow *window, const char *filename)
     snapWriter->SetFileName(filename);
     snapWriter->Write();
     }
-  else if ((l >= 4 && strcmp(file
+  else if ((l >= 4 && strcmp(filename + (l - 4), ".jpg") == 0) ||
+           (l >= 5 && strcmp(filename + (l - 5), ".jpeg") == 0))
+    {
+    vtkSmartPointer<vtkJPEGWriter> snapWriter =
+      vtkSmartPointer<vtkJPEGWriter>::New();
+    snapWriter->SetInputConnection(snap->GetOutputPort());
+    snapWriter->SetFileName(filename);
+    snapWriter->Write();
+    }
+  else if ((l >= 4 && strcmp(filename + (l - 4), ".tif") == 0) ||
+           (l >= 5 && strcmp(filename + (l - 5), ".tiff") == 0))
+    {
+    vtkSmartPointer<vtkTIFFWriter> snapWriter =
+      vtkSmartPointer<vtkTIFFWriter>::New();
+    snapWriter->SetInputConnection(snap->GetOutputPort());
+    snapWriter->SetFileName(filename);
+    snapWriter->Write();
+    }
+}
+
+void ComputeRange(vtkImageData *image, double range[2])
+{
+  // compute the range within a cylinder that is slightly smaller than
+  // the image bounds (the idea is to capture only the reconstructed
+  // portion of a CT image).
+  double spacing[3];
+  double origin[3];
+  int extent[6];
+  double bounds[6];
+  image->GetSpacing(spacing);
+  image->GetOrigin(origin);
+  image->GetExtent(extent);
+
+  for (int i = 0; i < 3; ++i)
+    {
+    double b1 = extent[2*i]*spacing[i] + origin[i];
+    double b2 = extent[2*i+1]*spacing[i] + origin[i];
+    bounds[2*i] = (b1 < b2 ? b1 : b2);
+    bounds[2*i+1] = (b1 < b2 ? b2 : b1);
+    spacing[i] = fabs(spacing[i]);
+    origi
