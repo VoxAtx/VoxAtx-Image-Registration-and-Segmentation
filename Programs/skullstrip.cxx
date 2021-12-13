@@ -792,4 +792,47 @@ void ComputeRange(vtkImageData *image, double range[2])
     bounds[2*i] = (b1 < b2 ? b1 : b2);
     bounds[2*i+1] = (b1 < b2 ? b2 : b1);
     spacing[i] = fabs(spacing[i]);
-    origi
+    origin[i] = bounds[2*i];
+    // reduce bounds by 2% in X and Y for use in cylinder generation
+    double bl = (i == 2 ? 0.0 : 0.01*(bounds[2*i+1] - bounds[2*i]));
+    bounds[2*i] += bl;
+    bounds[2*i+1] -= bl;
+    }
+
+  // extract just the reconstructed portion of CT image
+  vtkSmartPointer<vtkROIStencilSource> cylinder =
+    vtkSmartPointer<vtkROIStencilSource>::New();
+
+  cylinder->SetShapeToCylinderZ();
+  cylinder->SetInformationInput(image);
+  cylinder->SetBounds(bounds);
+  cylinder->Update();
+
+  // get the range within the cylinder
+  vtkSmartPointer<vtkImageHistogramStatistics> rangeFinder =
+    vtkSmartPointer<vtkImageHistogramStatistics>::New();
+
+  rangeFinder->GetAutoRangePercentiles(range);
+  rangeFinder->SET_INPUT_DATA(image);
+  rangeFinder->SET_STENCIL_DATA(cylinder->GetOutput());
+  rangeFinder->Update();
+
+  rangeFinder->GetAutoRange(range);
+}
+
+};
+
+struct skullstrip_options
+{
+  double bt;           // -t --threshold
+  double d1;           // --d1
+  double d2;           // --d2
+  double t;            // --tesselations
+  double rmin;         // --rmin
+  double rmax;         // --rmax
+  int n;               // -N --iterations
+  int display;         // -d --display
+  int silent;          // -s --silent
+  int coords;          // -C --coords
+  const char *surface; // -o (output mesh)
+  const char *output;  // 
