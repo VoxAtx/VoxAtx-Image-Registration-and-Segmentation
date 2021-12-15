@@ -895,4 +895,41 @@ const char *check_next_arg(
       fprintf(stderr, "%s", *u);
       }
     fprintf(stderr, "\n");
- 
+    exit(1);
+    }
+
+  return arg;
+}
+
+void skullstrip_show_usage(FILE *fp, const char *command)
+{
+  const char *cp = command + strlen(command);
+  while (cp > command && cp[-1] != '/' && cp[-1] != '\\') { --cp; }
+
+  fprintf(fp,
+    "Usage: %s [options] -o <output> <source image>\n", cp);
+  fprintf(fp, "\n");
+  fprintf(fp,
+    "For more information, type \"%s --help\"\n\n", command);
+}
+
+void skullstrip_show_help(FILE *fp, const char *command)
+{
+  const char *cp = command + strlen(command);
+  while (cp > command && cp[-1] != '/' && cp[-1] != '\\') { --cp; }
+
+  fprintf(fp,
+    "Usage: %s [options] -o <output> <source image>\n", cp);
+  fprintf(fp,
+    "\n"
+    "Written by David Gobbi <dgobbi@ucalgary.ca> at CIPAC.  Version 0.1.\n"
+    "\n"
+    "This program takes a 3D structural head MRI as input, and produces an\n"
+    "output image that consists of only the brain, with everything colored\n"
+    "black.  It uses the BET (Brain Extraction Technique) algorithm, and\n"
+    "has all of the strengths and weaknesses of that algorithm: it is very\n"
+    "fast, but undersegments the brain in certain regions, in particular\n"
+    "around the orbits.  The parameters of the algorithm can be adjusted to\n"
+    "improve the results (within limits).\n"
+    "\n"
+    "The \"-o\" option allows y
