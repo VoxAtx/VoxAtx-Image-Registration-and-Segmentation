@@ -835,4 +835,64 @@ struct skullstrip_options
   int silent;          // -s --silent
   int coords;          // -C --coords
   const char *surface; // -o (output mesh)
-  const char *output;  // 
+  const char *output;  // -o (output image)
+  const char *screenshot; // -j (output screenshot)
+  const char *source;
+};
+
+void skullstrip_initialize_options(skullstrip_options *options)
+{
+  options->bt = 0.5;
+  options->d1 = 20.0;
+  options->d2 = 10.0;
+  options->rmin = 3.0;
+  options->rmax = 10.0;
+  options->n = 1000;
+  options->t = 4;
+  options->display = 0;
+  options->silent = 0;
+  options->coords = NativeCoords;
+  options->screenshot = NULL;
+  options->output = NULL;
+  options->surface = NULL;
+  options->source = NULL;
+}
+
+const char *check_next_arg(
+  int argc, char *argv[], int *argi, const char *possib[])
+{
+  const char *op = argv[*argi - 1];
+  if (*argi >= argc ||
+      argv[*argi][0] == '-')
+    {
+    fprintf(stderr, "The option \"%s\" must be followed by an argument\n", op);
+    exit(1);
+    }
+  const char *arg = argv[(*argi)++];
+
+  if (possib == 0)
+    {
+    return arg;
+    }
+
+  bool match = false;
+  for (const char **t = possib; *t != 0; t++)
+    {
+    if (strcmp(*t, arg) == 0)
+      {
+      match = true;
+      break;
+      }
+    }
+
+  if (!match)
+    {
+    fprintf(stderr, "Incorrect value for option \"%s\": %s\n",
+            op, arg);
+    fprintf(stderr, "Allowed values:");
+    for (const char **u = possib; *u != 0; u++)
+      {
+      fprintf(stderr, "%s", *u);
+      }
+    fprintf(stderr, "\n");
+ 
