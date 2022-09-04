@@ -998,4 +998,56 @@ void skullstrip_show_help(FILE *fp, const char *command)
     "    a simple means of visually assessing the results retrospectively.\n"
     "\n"
     " -o <file>\n"
-  
+    "\n"
+    "    Provide an output file, either an image or a mesh.  If both an\n"
+    "    image and a mesh are to be written as output, then use the -o\n"
+    "    option twice, once for each.\n"
+    "\n"
+    "Reference for algorithm:\n"
+    "\n"
+    "    Stephen M. Smith, \"Fast Robust Automated Brain Extraction,\" Human\n"
+    "    Brain Mapping 17:143-155, 2002\n"
+    "\n");
+}
+
+int skullstrip_read_options(
+  int argc, char *argv[], skullstrip_options *options)
+{
+  static const char *coords_args[] = {
+    "DICOM", "LPS",
+    "NIFTI", "MINC", "RAS",
+    0 };
+
+  int argi = 1;
+  while (argi < argc)
+    {
+    const char *arg = argv[argi++];
+    if (arg[0] != '-')
+      {
+      int t = GuessFileType(arg);
+
+      if (t <= LastImageType)
+        {
+        if (options->source == 0)
+          {
+          options->source = arg;
+          }
+        else
+          {
+          fprintf(stderr, "Too many input images listed on command line\n");
+          exit(1);
+          }
+        }
+      }
+    else
+      {
+      if (strcmp(arg, "-h") == 0 ||
+          strcmp(arg, "--help") == 0)
+        {
+        skullstrip_show_help(stdout, argv[0]);
+        exit(0);
+        }
+      else if (strcmp(arg, "--threshold") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        options->bt = strtod(ar
