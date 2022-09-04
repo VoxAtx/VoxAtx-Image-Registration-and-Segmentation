@@ -1050,4 +1050,41 @@ int skullstrip_read_options(
       else if (strcmp(arg, "--threshold") == 0)
         {
         arg = check_next_arg(argc, argv, &argi, 0);
-        options->bt = strtod(ar
+        options->bt = strtod(arg, const_cast<char **>(&arg));
+        }
+      else if (strcmp(arg, "--d1") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        options->d1 = strtod(arg, const_cast<char **>(&arg));
+        }
+      else if (strcmp(arg, "--d2") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        options->d2 = strtod(arg, const_cast<char **>(&arg));
+        }
+      else if (strcmp(arg, "--rmin") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        options->rmin = strtod(arg, const_cast<char **>(&arg));
+        }
+      else if (strcmp(arg, "--rmax") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        options->rmax = strtod(arg, const_cast<char **>(&arg));
+        }
+      else if (strcmp(arg, "--iterations") == 0 ||
+               strcmp(arg, "-N") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        options->n = strtoul(arg, const_cast<char **>(&arg), 0);
+        }
+      else if (strcmp(arg, "--tesselations") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        options->t = strtoul(arg, const_cast<char **>(&arg), 0);
+        }
+      else if (strcmp(arg, "-C") == 0 ||
+               strcmp(arg, "--coords") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, coords_args);
+        if (strcmp(arg, "
