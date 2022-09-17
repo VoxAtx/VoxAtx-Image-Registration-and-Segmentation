@@ -1087,4 +1087,49 @@ int skullstrip_read_options(
                strcmp(arg, "--coords") == 0)
         {
         arg = check_next_arg(argc, argv, &argi, coords_args);
-        if (strcmp(arg, "
+        if (strcmp(arg, "DICOM") == 0 ||
+            strcmp(arg, "LPS") == 0)
+          {
+          options->coords = DICOMCoords;
+          }
+        else if (strcmp(arg, "MINC") == 0 ||
+                 strcmp(arg, "NIFTI") == 0 ||
+                 strcmp(arg, "RAS") == 0)
+          {
+          options->coords = NIFTICoords;
+          }
+        }
+      else if (strcmp(arg, "-d") == 0 ||
+               strcmp(arg, "--display") == 0)
+        {
+        options->display = 1;
+        }
+      else if (strcmp(arg, "-s") == 0 ||
+               strcmp(arg, "--silent") == 0)
+        {
+        options->silent = 1;
+        }
+      else if (strcmp(arg, "-j") == 0 ||
+               strcmp(arg, "--screenshot") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        options->screenshot = arg;
+        }
+      else if (strcmp(arg, "-o") == 0)
+        {
+        arg = check_next_arg(argc, argv, &argi, 0);
+        int t = GuessFileType(arg);
+        if (t <= LastImageType)
+          {
+          if (options->output)
+            {
+            fprintf(stderr, "Too many -o options specified!\n");
+            skullstrip_show_usage(stderr, argv[0]);
+            }
+          options->output = arg;
+          }
+        else if (t <= LastSurfaceType)
+          {
+          if (options->surface)
+            {
+            fprintf(stderr, "Too
