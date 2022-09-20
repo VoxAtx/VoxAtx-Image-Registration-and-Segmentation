@@ -1132,4 +1132,64 @@ int skullstrip_read_options(
           {
           if (options->surface)
             {
-            fprintf(stderr, "Too
+            fprintf(stderr, "Too many -o options specified!\n");
+            skullstrip_show_usage(stderr, argv[0]);
+            }
+          options->surface = arg;
+          }
+        }
+      else
+        {
+        fprintf(stderr, "Unrecognized option \"%s\"\n", arg);
+        skullstrip_show_usage(stderr, argv[0]);
+        exit(1);
+        }
+      }
+    }
+
+  return 1;
+}
+
+int main(int argc, char *argv[])
+{
+  skullstrip_options options;
+  skullstrip_initialize_options(&options);
+  skullstrip_read_options(argc, argv, &options);
+
+  // -------------------------------------------------------
+  // the files
+  const char *imagefile = options.output;
+  const char *meshfile = options.surface;
+  const char *sourcefile = options.source;
+  bool display = (options.display != 0 ||
+                  options.screenshot != 0);
+
+  if (!sourcefile)
+    {
+    skullstrip_show_usage(stderr, argv[0]);
+    return 1;
+    }
+
+  // -------------------------------------------------------
+  // load the images
+
+  if (options.coords == NativeCoords)
+    {
+    int ic = CoordSystem(sourcefile);
+
+    if (ic == DICOMCoords)
+      {
+      options.coords = DICOMCoords;
+      }
+    else
+      {
+      options.coords = NIFTICoords;
+      }
+    }
+
+  if (!options.silent)
+    {
+    cout << "Reading source image: " << sourcefile << endl;
+    }
+
+ 
