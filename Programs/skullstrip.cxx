@@ -1192,4 +1192,49 @@ int main(int argc, char *argv[])
     cout << "Reading source image: " << sourcefile << endl;
     }
 
- 
+  vtkSmartPointer<vtkImageData> sourceImage =
+    vtkSmartPointer<vtkImageData>::New();
+  vtkSmartPointer<vtkMatrix4x4> sourceMatrix =
+    vtkSmartPointer<vtkMatrix4x4>::New();
+  vtkSmartPointer<vtkImageReader2> sourceReader =
+    ReadImage(sourceImage, sourceMatrix, sourcefile, options.coords);
+  sourceReader->Delete();
+
+  if (!options.silent)
+    {
+    if (options.coords == DICOMCoords)
+      {
+      cout << "Using DICOM patient coords." << endl;;
+      }
+    else
+      {
+      cout << "Using NIFTI (or MINC) world coords." << endl;
+      }
+    }
+
+  // -------------------------------------------------------
+  // make a timer
+  vtkSmartPointer<vtkTimerLog> timer =
+    vtkSmartPointer<vtkTimerLog>::New();
+  double startTime = timer->GetUniversalTime();
+
+  // -------------------------------------------------------
+  // find the direction that is "superior"
+  double maxval = 0;
+  int maxidx = 0;
+  for (int idx = 0; idx < 3; idx++)
+    {
+    double vec[4] = { 0.0, 0.0, 0.0, 0.0 };
+    vec[idx] = 1.0;
+    sourceMatrix->MultiplyPoint(vec, vec);
+    if (fabs(vec[2]) > fabs(maxval))
+      {
+      maxval = vec[2];
+      maxidx = idx;
+      }
+    }
+
+  // set the Z extent to a set fraction of the other extents
+  int brainExtent[6];
+  sourceImage->GetExtent(brainExtent);
+  int idx1 = (maxidx + 1)
