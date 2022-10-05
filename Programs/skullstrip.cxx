@@ -1347,4 +1347,50 @@ int main(int argc, char *argv[])
   brainActor->SetUserMatrix(sourceMatrix);
 
   vtkSmartPointer<vtkImageStack> imageStack =
-    vtkSmartPointer
+    vtkSmartPointer<vtkImageStack>::New();
+  imageStack->AddImage(sourceActor);
+  imageStack->AddImage(brainActor);
+
+  renderer->AddViewProp(imageStack);
+  renderer->SetBackground(0,0,0);
+
+  renderWindow->SetSize(512,512);
+
+  double bounds[6], center[4], tspacing[3];
+  int extent[6];
+  sourceImage->GetBounds(bounds);
+  sourceImage->GetExtent(extent);
+  sourceImage->GetSpacing(tspacing);
+  center[0] = 0.5*(bounds[0] + bounds[1]);
+  center[1] = 0.5*(bounds[2] + bounds[3]);
+  center[2] = 0.5*(bounds[4] + bounds[5]);
+  center[3] = 1.0;
+  sourceMatrix->MultiplyPoint(center, center);
+
+  vtkCamera *camera = renderer->GetActiveCamera();
+  renderer->ResetCamera();
+  camera->SetFocalPoint(center);
+  camera->ParallelProjectionOn();
+  camera->SetParallelScale(0.5*(bounds[3] - bounds[2]));
+  SetViewFromMatrix(renderer, istyle, sourceMatrix, options.coords);
+  renderer->ResetCameraClippingRange();
+
+  if (display)
+    {
+    renderWindow->Render();
+    }
+
+  if (!options.silent)
+    {
+    cout << "stripping took " << (lastTime - startTime) << "s" << endl;
+    }
+
+  // -------------------------------------------------------
+  // capture a screen shot
+  if (options.screenshot)
+    {
+    WriteScreenshot(renderWindow, options.screenshot);
+    }
+
+  // -------------------------------------------------------
+  // write the outp
