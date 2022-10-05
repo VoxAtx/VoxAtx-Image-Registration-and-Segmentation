@@ -1313,4 +1313,38 @@ int main(int argc, char *argv[])
   sourceProperty->SetColorLevel(0.5*(sourceRange[0]+sourceRange[1]));
 
   sourceActor->SetMapper(sourceMapper);
-  sourceActor->SetProperty(so
+  sourceActor->SetProperty(sourceProperty);
+  sourceActor->SetUserMatrix(sourceMatrix);
+
+  vtkSmartPointer<vtkImageSlice> brainActor =
+    vtkSmartPointer<vtkImageSlice>::New();
+  vtkSmartPointer<vtkImageResliceMapper> brainMapper =
+    vtkSmartPointer<vtkImageResliceMapper>::New();
+  vtkSmartPointer<vtkImageProperty> brainProperty =
+    vtkSmartPointer<vtkImageProperty>::New();
+  vtkSmartPointer<vtkLookupTable> brainTable =
+    vtkSmartPointer<vtkLookupTable>::New();
+
+  brainMapper->SET_INPUT_DATA(stripper->GetOutput());
+  brainMapper->SliceAtFocalPointOn();
+  brainMapper->SliceFacesCameraOn();
+  brainMapper->ResampleToScreenPixelsOff();
+
+  brainTable->SetRampToLinear();
+  brainTable->SetHueRange(0.0, 0.0);
+  brainTable->SetSaturationRange(1.0, 1.0);
+  brainTable->SetValueRange(0.0, 1.0);
+  brainTable->Build();
+  brainTable->SetTableValue(0, 0.0, 0.0, 0.0, 0.0);
+
+  brainProperty->SetInterpolationTypeToLinear();
+  brainProperty->SetColorWindow((sourceRange[1]-sourceRange[0]));
+  brainProperty->SetColorLevel(0.5*(sourceRange[0]+sourceRange[1]));
+  brainProperty->SetLookupTable(brainTable);
+
+  brainActor->SetMapper(brainMapper);
+  brainActor->SetProperty(brainProperty);
+  brainActor->SetUserMatrix(sourceMatrix);
+
+  vtkSmartPointer<vtkImageStack> imageStack =
+    vtkSmartPointer
