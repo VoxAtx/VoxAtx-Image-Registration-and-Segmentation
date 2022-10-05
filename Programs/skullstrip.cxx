@@ -1237,4 +1237,46 @@ int main(int argc, char *argv[])
   // set the Z extent to a set fraction of the other extents
   int brainExtent[6];
   sourceImage->GetExtent(brainExtent);
-  int idx1 = (maxidx + 1)
+  int idx1 = (maxidx + 1) % 3;
+  int idx2 = (idx1 + 1) % 3;
+  int size1 = brainExtent[2*idx1 + 1] - brainExtent[2*idx1] + 1;
+  int size2 = brainExtent[2*idx2 + 1] - brainExtent[2*idx2] + 1;
+  int maxsize = brainExtent[2*maxidx + 1] - brainExtent[2*maxidx] + 1;
+  int size3 = vtkMath::Floor(sqrt(0.7*0.7*size1*size2));
+  // make sure computed size is not more than full image size
+  if (size3 > maxsize)
+    {
+    size3 = maxsize;
+    }
+  if (maxval < 0)
+    {
+    brainExtent[2*maxidx + 1] -= (maxsize - size3);
+    }
+  else
+    {
+    brainExtent[2*maxidx] += (maxsize - size3);
+    }
+
+  // -------------------------------------------------------
+  // strip the image
+
+  vtkSmartPointer<vtkImageMRIBrainExtractor> stripper =
+    vtkSmartPointer<vtkImageMRIBrainExtractor>::New();
+  stripper->SET_INPUT_DATA(sourceImage);
+  stripper->SetRMin(options.rmin);
+  stripper->SetRMax(options.rmax);
+  stripper->SetD1(options.d1);
+  stripper->SetD2(options.d2);
+  stripper->SetBT(options.bt);
+  stripper->SetNumberOfIterations(options.n);
+  stripper->SetNumberOfTessellations(options.t);
+  stripper->SetBrainExtent(brainExtent);
+  stripper->Update();
+
+  double lastTime = timer->GetUniversalTime();
+
+  // -------------------------------------------------------
+  // display the images
+
+  vtkSmartPointer<vtkRenderWindow> renderWindow =
+    vtkSmartPointer<vtkRenderWindow>::N
