@@ -1393,4 +1393,39 @@ int main(int argc, char *argv[])
     }
 
   // -------------------------------------------------------
-  // write the outp
+  // write the output file
+  if (imagefile)
+    {
+    if (!options.silent)
+      {
+      cout << "Writing stripped image: " << imagefile << endl;
+      }
+
+    WriteImage(sourceReader, sourceReader,
+      stripper->GetOutput(), sourceMatrix, imagefile, options.coords);
+    }
+  if (meshfile)
+    {
+    if (!options.silent)
+      {
+      cout << "Writing brain surface: " << meshfile << endl;
+      }
+
+    WriteMesh(stripper->GetBrainMesh(), sourceMatrix, meshfile);
+    }
+
+  if (!options.silent)
+    {
+    cout << "Done!" << endl;
+    }
+
+  // -------------------------------------------------------
+  // allow user to interact
+
+  if (options.display)
+    {
+    interactor->Start();
+    }
+
+  return 0;
+}
