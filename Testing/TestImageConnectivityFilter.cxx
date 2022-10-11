@@ -61,4 +61,44 @@ int main(int argc, char *argv[])
   reader->SetDataByteOrderToLittleEndian();
   reader->SetDataExtent(0, 63, 0, 63, 2, 4);
   reader->SetDataSpacing(3.2, 3.2, 1.5);
-  reader->S
+  reader->SetFilePrefix(fname);
+
+  delete [] fname;
+
+  vtkSmartPointer<vtkPoints> seedPoints =
+    vtkSmartPointer<vtkPoints>::New();
+  seedPoints->InsertNextPoint(1, 1, 5.25);
+  seedPoints->InsertNextPoint(100.8, 100.8, 5.25);
+  vtkSmartPointer<vtkUnsignedCharArray> seedScalars =
+    vtkSmartPointer<vtkUnsignedCharArray>::New();
+  seedScalars->InsertNextValue(2);
+  seedScalars->InsertNextValue(5);
+  vtkSmartPointer<vtkPolyData> seedData =
+    vtkSmartPointer<vtkPolyData>::New();
+  seedData->SetPoints(seedPoints);
+  seedData->GetPointData()->SetScalars(seedScalars);
+
+  for (int i = 0; i < 12; i++)
+    {
+    int j = i % 4;
+    int k = i / 4;
+    vtkSmartPointer<vtkRenderer> renderer =
+      vtkSmartPointer<vtkRenderer>::New();
+    vtkCamera *camera = renderer->GetActiveCamera();
+    renderer->SetBackground(0.0, 0.0, 0.0);
+    renderer->SetViewport(k/3.0, j/4.0, (k + 1)/3.0, (j + 1)/4.0);
+    renWin->AddRenderer(renderer);
+
+    vtkSmartPointer<vtkImageConnectivityFilter> connectivity =
+      vtkSmartPointer<vtkImageConnectivityFilter>::New();
+    connectivity->SetInputConnection(reader->GetOutputPort());
+    //connectivity->SetSeedData(seedData);
+    //connectivity->SetExtractionModeToSeededRegions();
+    connectivity->SetLabelModeToSizeRank();
+    if (k == 0)
+      {
+      connectivity->SetScalarRange(0, 800);
+      }
+    else if (k == 1)
+      {
+      connectivity->Se
