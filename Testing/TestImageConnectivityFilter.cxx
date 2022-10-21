@@ -135,4 +135,40 @@ int main(int argc, char *argv[])
            << extentArray->GetValue(6*r) << ","
            << extentArray->GetValue(6*r+1) << ","
            << extentArray->GetValue(6*r+2) << ","
-           <<
+           << extentArray->GetValue(6*r+3) << ","
+           << extentArray->GetValue(6*r+4) << ","
+           << extentArray->GetValue(6*r+5) << "])";
+      }
+    cout << "\n";
+
+    vtkSmartPointer<vtkImageSliceMapper> imageMapper =
+      vtkSmartPointer<vtkImageSliceMapper>::New();
+    imageMapper->SetInputConnection(connectivity->GetOutputPort());
+    imageMapper->BorderOn();
+    imageMapper->SliceFacesCameraOn();
+    imageMapper->SliceAtFocalPointOn();
+
+    double point[3] = { 100.8, 100.8, 5.25 };
+    camera->SetFocalPoint(point);
+    point[2] += 500.0;
+    camera->SetPosition(point);
+    camera->SetViewUp(0.0, 1.0, 0.0);
+    camera->ParallelProjectionOn();
+    camera->SetParallelScale(3.2*32);
+
+    vtkSmartPointer<vtkImageSlice> image =
+      vtkSmartPointer<vtkImageSlice>::New();
+    image->SetMapper(imageMapper);
+    image->GetProperty()->SetColorWindow(6);
+    image->GetProperty()->SetColorLevel(3);
+    renderer->AddViewProp(image);
+    }
+
+  renWin->SetSize(192, 256);
+
+  iren->Initialize();
+  renWin->Render();
+  iren->Start();
+
+  return EXIT_SUCCESS;
+}
